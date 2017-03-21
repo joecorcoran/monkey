@@ -21,7 +21,7 @@ impl<'a> Iterator for Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str) -> Lexer {
+    pub fn new(input: &'a str) -> Lexer {
         let graphemes = US::graphemes(input, true).collect::<Vec<&str>>();
         Lexer {
             input: graphemes,
@@ -97,6 +97,14 @@ impl<'a> Lexer<'a> {
                 None
             }
         }
+    }
+
+    pub fn tokenize(&mut self) -> Vec<Token> {
+        let mut result = vec![];
+        while let Some(token) = self.next_token() {
+            result.push(token);
+        }
+        result
     }
 }
 
