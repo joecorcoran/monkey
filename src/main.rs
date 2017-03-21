@@ -15,6 +15,7 @@ fn main() {
 	let readline = rl.readline(">> ");
 	match readline {
 	    Ok(line) => {
+		if line == "exit" { break; }
 		let mut lexer = Lexer::new(&line);
 		println!("{:?}", lexer.tokenize());
 	    },

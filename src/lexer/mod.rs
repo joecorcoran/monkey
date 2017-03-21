@@ -46,8 +46,11 @@ impl<'a> Lexer<'a> {
 
     fn take_alphanumeric(&mut self) -> String {
         let mut alphanum = vec![];
-        while Self::is_alphabetic(self.peek().unwrap_or("")) {
-            alphanum.push(self.next().unwrap());
+        while self.peek().unwrap_or("").is_alphanumeric() {
+            match self.next() {
+                Some(g) => alphanum.push(g),
+                None => break
+            }
         }
         alphanum.concat()
     }
@@ -55,7 +58,10 @@ impl<'a> Lexer<'a> {
     fn take_numeric(&mut self) -> String {
         let mut num = vec![];
         while Self::is_numeric(self.peek().unwrap_or("")) {
-            num.push(self.next().unwrap());
+            match self.next() {
+                Some(g) => num.push(g),
+                None => break
+            }
         }
         num.concat()
     }
