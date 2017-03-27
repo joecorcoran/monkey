@@ -4,8 +4,10 @@ extern crate rustyline;
 extern crate std_unicode;
 extern crate unicode_segmentation;
 
-mod token;
+mod ast;
 mod lexer;
+mod parser;
+mod token;
 
 use lexer::Lexer;
 

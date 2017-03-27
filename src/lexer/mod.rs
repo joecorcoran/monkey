@@ -66,7 +66,7 @@ impl<'a> Lexer<'a> {
         num.concat()
     }
 
-    fn next_token(&mut self) -> Option<Token> {
+    pub fn next_token(&mut self) -> Option<Token> {
         match self.peek() {
             // Swallow whitespace
             Some(g) if g.is_whitespace() => {
