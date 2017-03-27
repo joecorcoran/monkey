@@ -1,5 +1,3 @@
-use token::Token;
-
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     Let { identifier: Expression },

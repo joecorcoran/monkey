@@ -3,7 +3,8 @@ use lexer::Lexer;
 use token::Token;
 
 pub struct Parser<'a, 'b: 'a> {
-    lexer: &'a mut Lexer<'b>
+    lexer: &'a mut Lexer<'b>,
+    errors: Vec<String>
 }
 
 impl<'a, 'b> Iterator for Parser<'a, 'b> {
@@ -16,17 +17,20 @@ impl<'a, 'b> Iterator for Parser<'a, 'b> {
 
 impl<'a, 'b> Parser<'a, 'b> {
     fn new(lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
-        Parser {
-            lexer: lexer
-        }
+        Parser { lexer: lexer, errors: vec![] }
+    }
+
+    fn peek_error(&mut self, expected: &str, actual: Token) {
+	self.errors.push(format!("[peek error] expected {:?}, got {:?}", expected, actual));
     }
 
     fn parse_let(&mut self, program: &mut Program) {
-	if let Some(Token::Identifier(id)) = self.next() {
-	    // parse until Token::Semicolon
-	    program.add(Statement::Let { identifier: Expression::Identifier(id) }); 
-	} else {
-	    panic!("Could not parse let statement");
+	match self.next() {
+	    Some(Token::Identifier(id)) => {
+		program.add(Statement::Let { identifier: Expression::Identifier(id) }); 
+	    },
+	    Some(token) => self.peek_error("identifier", token),
+	    None => self.peek_error("identifier", Token::EOF)
 	}
     }
 
