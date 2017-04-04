@@ -35,13 +35,32 @@ impl<'a, 'b> Parser<'a, 'b> {
 	self.lexer.peek_token()
     }
 
-    fn peek_error(&mut self, expected: &str, actual: Token) {
-	self.errors.push(format!("[peek error] expected {:?}, got {:?}", expected, actual));
+    fn peek_error(&mut self, expected: &str) {
+	self.errors.push(format!("Expected to find {:?}", expected));
+    }
+
+    fn skip_syntax(&mut self, expected: &str) {
+	use self::Token::*;
+
+	match self.peek() {
+	    Some(Let) | Some(Return) | Some(Assign) => {
+		self.next();
+	    },
+	    Some(t) => {
+		self.peek_error(expected);
+	    },
+	    None => {}
+	}
+    }
+
+    fn end_statement(&mut self) {
+	if Some(Token::Semicolon) == self.peek() {
+	    self.next();
+	}
     }
 
     fn parse_statement(&mut self, program: &mut Program) {
-	let token = self.peek();
-	match token {
+	match self.peek() {
 	    Some(Token::Let) => self.parse_statement_let(program),
 	    Some(Token::Return) => self.parse_statement_return(program),
 	    Some(_) => self.parse_statement_expression(program),
@@ -50,47 +69,44 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_statement_let(&mut self, program: &mut Program) {
-	self.next(); // Skip keyword
+	self.skip_syntax("let");
 	
-	// TODO refactor by de-nesting
-	if let Some(Token::Identifier(id)) = self.next() {
-	    if let Some(Token::Assign) = self.peek() {
-		self.next(); // Skip assign
-		if let Some(expression) = self.parse_expression(Precedence::Lowest) {
-		    program.add(Statement::Let {
-			identifier: Expression::Identifier(id),
-			expression: expression
-		    }); 
-		} else {
-		    let token = self.next().unwrap();
-		    self.peek_error("expression", token);
-		}
+	if let Some(id) = self.parse_identifier() {
+	    self.skip_syntax("assign");
+
+	    if let Some(expression) = self.parse_expression(Precedence::Lowest) {
+		program.add(Statement::Let {
+		    identifier: id,
+		    expression: expression
+		});
 	    } else {
-		let token = self.next().unwrap();
-		self.peek_error("assign", token);
+		self.peek_error("expression");
 	    }
 	} else {
-	    let token = self.next().unwrap();
-	    self.peek_error("identifier", token);
+	    self.peek_error("identifier");
 	}
-	// TODO take until semicolon
+
+	self.end_statement();
     }
 
     fn parse_statement_return(&mut self, program: &mut Program) {
-	self.next(); // Skip keyword
+	self.skip_syntax("return");
+
 	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
 	    program.add(Statement::Return { expression: expression });
 	} else {
-	    self.peek_error("expression", Token::EOF);
+	    self.peek_error("expression");
 	}
-	// TODO take until semicolon
+
+	self.end_statement();
     }
 
     fn parse_statement_expression(&mut self, program: &mut Program) {
 	if let Some(e) = self.parse_expression(Precedence::Lowest) {
 	    program.add(Statement::Expression { expression: e });
 	}
-	if self.peek() == Some(Token::Semicolon) { self.next(); }
+
+	self.end_statement();
     }
 
     fn token_precedence(token: &Token) -> Precedence {
