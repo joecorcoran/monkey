@@ -1,14 +1,21 @@
+use token::Token;
+
 #[derive(Debug, PartialEq)]
 pub enum Statement {
-    Let { identifier: Expression },
-    Return
+    Let { identifier: Expression, expression: Expression },
+    Return { expression: Expression },
+    Expression { expression: Expression }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expression {
+    Identifier(String),
+    Integer(usize),
+    Prefix { operator: Token, right: Box<Expression> },
+    Infix { left: Box<Expression>, operator: Token, right: Box<Expression> }
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Expression {
-    Identifier(String)
-}
-
 pub struct Program {
     pub statements: Vec<Statement>
 }

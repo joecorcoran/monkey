@@ -95,14 +95,17 @@ impl<'a> Lexer<'a> {
                 Some(lookup(alphanum))
             },
             // Single-grapheme tokens
-            Some(_) => {
-                Some(lookup(self.next().unwrap()))
-            },
+            Some(_) => Some(lookup(self.next().unwrap())),
             // EOF
-            None => {
-                None
-            }
+            None => None
         }
+    }
+
+    pub fn peek_token(&mut self) -> Option<Token> {
+        let current_index = self.index;
+        let token = self.next_token();
+        self.index = current_index;
+        token
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {
@@ -119,7 +122,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_iterator() {
+    fn iterator() {
         let s = "hä";
         let mut l = Lexer::new(s);
 
@@ -129,7 +132,7 @@ mod test {
     }
 
     #[test]
-    fn test_peekable() {
+    fn peekable() {
         let s = "hä?";
         let mut l = Lexer::new(s);
 
@@ -149,7 +152,7 @@ mod test {
     }
 
     #[test]
-    fn test_lexer() {
+    fn token_iter() {
         let s = "let foo = 123; foo != 123;";
         let mut l = Lexer::new(s);
 
@@ -165,5 +168,27 @@ mod test {
         assert_eq!(Token::Semicolon, l.next_token().unwrap());
 
         assert_eq!(None, l.next_token())
+    }
+
+    #[test]
+    fn token_peekable() {
+        let s = "a == b;";
+        let mut l = Lexer::new(s);
+
+        assert_eq!(Token::Identifier("a".to_string()), l.peek_token().unwrap());
+        assert_eq!(Token::Identifier("a".to_string()), l.peek_token().unwrap());
+        assert_eq!(Token::Identifier("a".to_string()), l.next_token().unwrap());
+
+        assert_eq!(Token::Equal, l.peek_token().unwrap());
+        assert_eq!(Token::Equal, l.next_token().unwrap());
+
+        assert_eq!(Token::Identifier("b".to_string()), l.peek_token().unwrap());
+        assert_eq!(Token::Identifier("b".to_string()), l.next_token().unwrap());
+
+        assert_eq!(Token::Semicolon, l.peek_token().unwrap());
+        assert_eq!(Token::Semicolon, l.next_token().unwrap());
+
+        assert_eq!(None, l.peek_token());
+        assert_eq!(None, l.next_token());
     }
 }
