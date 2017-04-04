@@ -286,6 +286,20 @@ mod test {
 	    }
 	};
 	assert_first_statement(prec_program, prec_statement);
+
+	let prec_program_2 = parse_statement("5 * 5 / 5;");
+	let prec_statement_2 = Statement::Expression {
+	    expression: Expression::Infix {
+		left: Box::new(Expression::Infix {
+		    left: Box::new(Expression::Integer(5)),
+		    operator: Token::Asterisk,
+		    right: Box::new(Expression::Integer(5))
+		}),
+		operator: Token::Slash,
+		right: Box::new(Expression::Integer(5)) 
+	    }
+	};
+	assert_first_statement(prec_program_2, prec_statement_2);
     }
 }
 
