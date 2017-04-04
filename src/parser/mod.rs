@@ -43,7 +43,8 @@ impl<'a, 'b> Parser<'a, 'b> {
 	use self::Token::*;
 
 	match self.peek() {
-	    Some(Let) | Some(Return) | Some(Assign) => {
+	    Some(Let) | Some(Return) | Some(Assign) |
+	    Some(LParen) | Some(RParen) => {
 		self.next();
 	    },
 	    Some(_) => {
@@ -141,6 +142,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Token::Identifier(_)) => self.parse_identifier(),
 	    Some(Token::Integer(_)) => self.parse_integer(),
 	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
+	    Some(Token::LParen) => self.parse_group(),
 	    Some(Token::Bang) | Some(Token::Minus) => {
 		let operator = self.next().unwrap();
 		if let Some(right) = self.parse_expression(Precedence::Prefix) {
@@ -174,6 +176,17 @@ impl<'a, 'b> Parser<'a, 'b> {
 		}
 	    },
 	    _ => None
+	}
+    }
+
+    fn parse_group(&mut self) -> Option<Expression> {
+	self.skip_syntax("(");
+
+	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
+	    self.skip_syntax(")");
+	    Some(expression)
+	} else {
+	    None
 	}
     }
 
@@ -268,16 +281,6 @@ mod test {
 
     #[test]
     fn infix_expression() {
-	let plus_program = parse_statement("5 + 5;");
-	let plus_statement = Statement::Expression {
-	    expression: Expression::Infix {
-		left: Box::new(Expression::Integer(5)),
-		operator: Token::Plus,
-		right: Box::new(Expression::Integer(5))
-	    }
-	};
-	assert_first_statement(plus_program, plus_statement);
-
 	let eq_program = parse_statement("true == false;");
 	let eq_statement = Statement::Expression {
 	    expression: Expression::Infix {
@@ -287,7 +290,10 @@ mod test {
 	    }
 	};
 	assert_first_statement(eq_program, eq_statement);
+    }
 
+    #[test]
+    fn implicit_precedence() {
 	let prec_program = parse_statement("5 + 5 / 5;");
 	let prec_statement = Statement::Expression {
 	    expression: Expression::Infix {
@@ -315,6 +321,24 @@ mod test {
 	    }
 	};
 	assert_first_statement(prec_program_2, prec_statement_2);
+    }
+
+
+    #[test]
+    fn explicit_precedence() {
+	let program = parse_statement("5 + (5 + 5);");
+	let statement = Statement::Expression {
+	    expression: Expression::Infix {
+		left: Box::new(Expression::Integer(5)),
+		operator: Token::Plus,
+		right: Box::new(Expression::Infix {
+		    left: Box::new(Expression::Integer(5)),
+		    operator: Token::Plus,
+		    right: Box::new(Expression::Integer(5))
+		}) 
+	    }
+	};
+	assert_first_statement(program, statement);
     }
 }
 
