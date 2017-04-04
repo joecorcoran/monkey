@@ -46,7 +46,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Let) | Some(Return) | Some(Assign) => {
 		self.next();
 	    },
-	    Some(t) => {
+	    Some(_) => {
 		self.peek_error(expected);
 	    },
 	    None => {}
@@ -140,6 +140,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	match self.peek() {
 	    Some(Token::Identifier(_)) => self.parse_identifier(),
 	    Some(Token::Integer(_)) => self.parse_integer(),
+	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
 	    Some(Token::Bang) | Some(Token::Minus) => {
 		let operator = self.next().unwrap();
 		if let Some(right) = self.parse_expression(Precedence::Prefix) {
@@ -191,6 +192,14 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    None
 	}
     }
+
+    fn parse_boolean(&mut self) -> Option<Expression> {
+	match self.next() {
+	    Some(Token::True) =>  Some(Expression::Boolean(true)),
+	    Some(Token::False) => Some(Expression::Boolean(false)),
+	    _ => None
+	}
+    }
 }
 
 #[cfg(test)]
@@ -237,6 +246,12 @@ mod test {
     }
 
     #[test]
+    fn parse_boolean() {
+	let program = parse_statement("true;");
+	assert_first_statement(program, Statement::Expression { expression: Expression::Boolean(true) });
+    }
+
+    #[test]
     fn prefix_expression() {
 	let program = parse_statement("!5;");
 	let statement = Statement::Expression {
@@ -263,12 +278,12 @@ mod test {
 	};
 	assert_first_statement(plus_program, plus_statement);
 
-	let eq_program = parse_statement("5 == 5;");
+	let eq_program = parse_statement("true == false;");
 	let eq_statement = Statement::Expression {
 	    expression: Expression::Infix {
-		left: Box::new(Expression::Integer(5)),
+		left: Box::new(Expression::Boolean(true)),
 		operator: Token::Equal,
-		right: Box::new(Expression::Integer(5))
+		right: Box::new(Expression::Boolean(false))
 	    }
 	};
 	assert_first_statement(eq_program, eq_statement);
@@ -287,15 +302,15 @@ mod test {
 	};
 	assert_first_statement(prec_program, prec_statement);
 
-	let prec_program_2 = parse_statement("5 * 5 / 5;");
+	let prec_program_2 = parse_statement("5 + 5 + 5;");
 	let prec_statement_2 = Statement::Expression {
 	    expression: Expression::Infix {
 		left: Box::new(Expression::Infix {
 		    left: Box::new(Expression::Integer(5)),
-		    operator: Token::Asterisk,
+		    operator: Token::Plus,
 		    right: Box::new(Expression::Integer(5))
 		}),
-		operator: Token::Slash,
+		operator: Token::Plus,
 		right: Box::new(Expression::Integer(5)) 
 	    }
 	};

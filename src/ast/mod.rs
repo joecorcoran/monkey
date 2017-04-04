@@ -11,6 +11,7 @@ pub enum Statement {
 pub enum Expression {
     Identifier(String),
     Integer(usize),
+    Boolean(bool),
     Prefix { operator: Token, right: Box<Expression> },
     Infix { left: Box<Expression>, operator: Token, right: Box<Expression> }
 }
