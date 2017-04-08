@@ -31,26 +31,36 @@ impl<'a, 'b> Parser<'a, 'b> {
         Parser { lexer: lexer, errors: vec![] }
     }
 
+    fn token_precedence(token: &Token) -> Precedence {
+	match *token {
+	    Token::Equal | Token::NotEqual => Precedence::Equal,
+	    Token::Lt | Token::Gt          => Precedence::LtGt,
+	    Token::Plus | Token::Minus     => Precedence::Sum,
+	    Token::Slash | Token::Asterisk => Precedence::Product,
+	    Token::LParen                  => Precedence::Call,
+	    _                              => Precedence::Lowest
+	}
+    }
+
     fn peek(&mut self) -> Option<Token> {
 	self.lexer.peek_token()
     }
 
-    fn peek_error(&mut self, expected: &str) {
+    fn peek_error(&mut self, expected: Token) {
 	self.errors.push(format!("Expected to find {:?}", expected));
     }
 
-    fn skip_syntax(&mut self, expected: &str) {
-	use self::Token::*;
+    fn parse_error(&mut self) {
+	self.errors.push("Could not parse expression".to_string());
+    }
 
-	match self.peek() {
-	    Some(Let) | Some(Return) | Some(Assign) |
-	    Some(LParen) | Some(RParen) => {
+    fn skip_syntax(&mut self, expected: Token) {
+	if let Some(token) = self.peek() {
+	    if token == expected {
 		self.next();
-	    },
-	    Some(_) => {
+	    } else {
 		self.peek_error(expected);
-	    },
-	    None => {}
+	    }
 	}
     }
 
@@ -60,64 +70,62 @@ impl<'a, 'b> Parser<'a, 'b> {
 	}
     }
 
-    fn parse_statement(&mut self, program: &mut Program) {
-	match self.peek() {
-	    Some(Token::Let) => self.parse_statement_let(program),
-	    Some(Token::Return) => self.parse_statement_return(program),
-	    Some(_) => self.parse_statement_expression(program),
-	    None => {}
+    fn parse(&mut self, program: &mut Program) {
+	while let Some(statement) = self.parse_statement() {
+	    program.add(statement);
 	}
     }
 
-    fn parse_statement_let(&mut self, program: &mut Program) {
-	self.skip_syntax("let");
+    fn parse_statement(&mut self) -> Option<Statement> {
+	match self.peek() {
+	    Some(Token::Let) => self.parse_statement_let(),
+	    Some(Token::Return) => self.parse_statement_return(),
+	    Some(_) => self.parse_statement_expression(),
+	    None => None
+	}
+    }
+
+    fn parse_statement_let(&mut self) -> Option<Statement> {
+	self.skip_syntax(Token::Let);
 	
 	if let Some(id) = self.parse_identifier() {
-	    self.skip_syntax("assign");
+	    self.skip_syntax(Token::Assign);
 
 	    if let Some(expression) = self.parse_expression(Precedence::Lowest) {
-		program.add(Statement::Let {
+		self.end_statement();
+		Some(Statement::Let {
 		    identifier: id,
 		    expression: expression
-		});
+		})
 	    } else {
-		self.peek_error("expression");
+		self.parse_error();
+		None
 	    }
 	} else {
-	    self.peek_error("identifier");
+	    self.peek_error(Token::Identifier("*".to_string()));
+	    None
 	}
 
-	self.end_statement();
     }
 
-    fn parse_statement_return(&mut self, program: &mut Program) {
-	self.skip_syntax("return");
+    fn parse_statement_return(&mut self) -> Option<Statement> {
+	self.skip_syntax(Token::Return);
 
 	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
-	    program.add(Statement::Return { expression: expression });
+	    self.end_statement();
+	    Some(Statement::Return { expression: expression })
 	} else {
-	    self.peek_error("expression");
+	    self.parse_error();
+	    None
 	}
-
-	self.end_statement();
     }
 
-    fn parse_statement_expression(&mut self, program: &mut Program) {
-	if let Some(e) = self.parse_expression(Precedence::Lowest) {
-	    program.add(Statement::Expression { expression: e });
-	}
-
-	self.end_statement();
-    }
-
-    fn token_precedence(token: &Token) -> Precedence {
-	match *token {
-	    Token::Equal | Token::NotEqual => Precedence::Equal,
-	    Token::Lt | Token::Gt          => Precedence::LtGt,
-	    Token::Plus | Token::Minus     => Precedence::Sum,
-	    Token::Slash | Token::Asterisk => Precedence::Product,
-	    Token::LParen                  => Precedence::Call,
-	    _                              => Precedence::Lowest
+    fn parse_statement_expression(&mut self) -> Option<Statement> {
+	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
+	    self.end_statement();
+	    Some(Statement::Expression { expression: expression })
+	} else {
+	    None
 	}
     }
 
@@ -143,6 +151,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Token::Integer(_)) => self.parse_integer(),
 	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
 	    Some(Token::LParen) => self.parse_group(),
+	    Some(Token::If) => self.parse_if(),
 	    Some(Token::Bang) | Some(Token::Minus) => {
 		let operator = self.next().unwrap();
 		if let Some(right) = self.parse_expression(Precedence::Prefix) {
@@ -179,11 +188,55 @@ impl<'a, 'b> Parser<'a, 'b> {
 	}
     }
 
+    fn parse_block(&mut self) -> Option<Statement> {
+	if Some(Token::LBrace) == self.next() {
+	    let mut statements: Vec<Box<Statement>> = vec![];
+	    while let Some(t) = self.peek() {
+		if t == Token::RBrace { break }
+		if let Some(statement) = self.parse_statement() {
+		    statements.push(Box::new(statement));
+		}
+	    }
+	    if Some(Token::RBrace) == self.next() {
+		Some(Statement::Block { statements: statements })
+	    } else {
+		None
+	    }
+	} else {
+	    None
+	}
+    }
+
+    fn parse_if(&mut self) -> Option<Expression> {
+	self.skip_syntax(Token::If);
+	self.skip_syntax(Token::LParen);
+
+	if let Some(condition) = self.parse_expression(Precedence::Lowest) {
+	    self.skip_syntax(Token::RParen);    
+
+	    if let Some(consequence) = self.parse_block() {
+		self.skip_syntax(Token::Else);
+		let alternative = self.parse_block().and_then(|b| Some(Box::new(b)));
+		Some(Expression::If {
+		    condition: Box::new(condition),
+		    consequence: Box::new(consequence),
+		    alternative: alternative
+		})
+	    } else {
+		self.parse_error();
+		None
+	    }
+	} else {
+	    self.parse_error();
+	    None
+	}
+    }
+
     fn parse_group(&mut self) -> Option<Expression> {
-	self.skip_syntax("(");
+	self.skip_syntax(Token::LParen);
 
 	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
-	    self.skip_syntax(")");
+	    self.skip_syntax(Token::RParen);
 	    Some(expression)
 	} else {
 	    None
@@ -219,11 +272,11 @@ impl<'a, 'b> Parser<'a, 'b> {
 mod test {
     use super::*;
 
-    fn parse_statement(input: &str) -> Program {
+    fn parse(input: &str) -> Program {
 	let mut lexer = Lexer::new(input);
 	let mut parser = Parser::new(&mut lexer);
 	let mut program = Program::new();
-	parser.parse_statement(&mut program);
+	parser.parse(&mut program);
 	if parser.errors.len() > 0 {
 	    panic!("Parser error: {:?}", parser.errors);
 	}
@@ -231,13 +284,17 @@ mod test {
     }
 
     fn assert_first_statement(program: Program, statement: Statement) {
-	let actual = program.statements.get(0).unwrap();
-	assert_eq!(statement, *actual);	
+	let actual = program.statements.get(0);
+	if let Some(s) = actual {
+	    assert_eq!(statement, *s);
+	} else {
+	    panic!("Statements empty");
+	}
     }
 
     #[test]
     fn parse_let() {
-	let program = parse_statement("let foo = 1;");
+	let program = parse("let foo = 1;");
 	let statement = Statement::Let {
 	    identifier: Expression::Identifier("foo".to_string()),
 	    expression: Expression::Integer(1)
@@ -247,32 +304,32 @@ mod test {
 
     #[test]
     fn parse_return() {
-	let program = parse_statement("return 1;");
+	let program = parse("return 1;");
 	let statement = Statement::Return { expression: Expression::Integer(1) };
 	assert_first_statement(program, statement);
     }
 
     #[test]
     fn parse_identifier() {
-	let program = parse_statement("foo;");
+	let program = parse("foo;");
 	assert_first_statement(program, Statement::Expression { expression: Expression::Identifier("foo".to_string()) });
     }
 
     #[test]
     fn parse_boolean() {
-	let program = parse_statement("true;");
+	let program = parse("true;");
 	assert_first_statement(program, Statement::Expression { expression: Expression::Boolean(true) });
     }
 
     #[test]
     fn prefix_expression() {
-	let program = parse_statement("!5;");
+	let program = parse("!5;");
 	let statement = Statement::Expression {
 	    expression: Expression::Prefix { operator: Token::Bang, right: Box::new(Expression::Integer(5)) }
 	};
 	assert_first_statement(program, statement);
 
-	let program = parse_statement("-5;");
+	let program = parse("-5;");
 	let statement = Statement::Expression {
 	    expression: Expression::Prefix { operator: Token::Minus, right: Box::new(Expression::Integer(5)) }
 	};
@@ -281,7 +338,7 @@ mod test {
 
     #[test]
     fn infix_expression() {
-	let eq_program = parse_statement("true == false;");
+	let eq_program = parse("true == false;");
 	let eq_statement = Statement::Expression {
 	    expression: Expression::Infix {
 		left: Box::new(Expression::Boolean(true)),
@@ -294,7 +351,7 @@ mod test {
 
     #[test]
     fn implicit_precedence() {
-	let prec_program = parse_statement("5 + 5 / 5;");
+	let prec_program = parse("5 + 5 / 5;");
 	let prec_statement = Statement::Expression {
 	    expression: Expression::Infix {
 		left: Box::new(Expression::Integer(5)),
@@ -308,7 +365,7 @@ mod test {
 	};
 	assert_first_statement(prec_program, prec_statement);
 
-	let prec_program_2 = parse_statement("5 + 5 + 5;");
+	let prec_program_2 = parse("5 + 5 + 5;");
 	let prec_statement_2 = Statement::Expression {
 	    expression: Expression::Infix {
 		left: Box::new(Expression::Infix {
@@ -326,7 +383,7 @@ mod test {
 
     #[test]
     fn explicit_precedence() {
-	let program = parse_statement("5 + (5 + 5);");
+	let program = parse("5 + (5 + 5);");
 	let statement = Statement::Expression {
 	    expression: Expression::Infix {
 		left: Box::new(Expression::Integer(5)),
@@ -336,6 +393,52 @@ mod test {
 		    operator: Token::Plus,
 		    right: Box::new(Expression::Integer(5))
 		}) 
+	    }
+	};
+	assert_first_statement(program, statement);
+    }
+
+    #[test]
+    fn if_expression() {
+	let program = parse("if (x > y) { x }");
+	let statement = Statement::Expression {
+	    expression: Expression::If {
+		condition: Box::new(Expression::Infix {
+		    left: Box::new(Expression::Identifier("x".to_string())),
+		    operator: Token::Gt,
+		    right: Box::new(Expression::Identifier("y".to_string()))
+		}),
+		consequence: Box::new(Statement::Block {
+		    statements: vec![
+			Box::new(Statement::Expression { expression: Expression::Identifier("x".to_string()) })
+		    ]
+		}),
+		alternative: None
+	    }
+	};
+	assert_first_statement(program, statement);
+    }
+
+    #[test]
+    fn if_else_expression() {
+	let program = parse("if (x > y) { x } else { y }");
+	let statement = Statement::Expression {
+	    expression: Expression::If {
+		condition: Box::new(Expression::Infix {
+		    left: Box::new(Expression::Identifier("x".to_string())),
+		    operator: Token::Gt,
+		    right: Box::new(Expression::Identifier("y".to_string()))
+		}),
+		consequence: Box::new(Statement::Block {
+		    statements: vec![
+			Box::new(Statement::Expression { expression: Expression::Identifier("x".to_string()) })
+		    ]
+		}),
+		alternative: Some(Box::new(Statement::Block {
+		    statements: vec![
+			Box::new(Statement::Expression { expression: Expression::Identifier("y".to_string()) })
+		    ]
+		}))
 	    }
 	};
 	assert_first_statement(program, statement);

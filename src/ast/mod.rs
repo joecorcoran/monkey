@@ -1,10 +1,11 @@
 use token::Token;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     Let { identifier: Expression, expression: Expression },
     Return { expression: Expression },
-    Expression { expression: Expression }
+    Expression { expression: Expression },
+    Block { statements: Vec<Box<Statement>> }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,7 +14,8 @@ pub enum Expression {
     Integer(usize),
     Boolean(bool),
     Prefix { operator: Token, right: Box<Expression> },
-    Infix { left: Box<Expression>, operator: Token, right: Box<Expression> }
+    Infix { left: Box<Expression>, operator: Token, right: Box<Expression> },
+    If { condition: Box<Expression>, consequence: Box<Statement>, alternative: Option<Box<Statement>> }
 }
 
 #[derive(Debug, PartialEq)]
