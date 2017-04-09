@@ -1,7 +1,7 @@
 use token::Token;
 
 pub type Parameters = Option<Vec<Box<Expression>>>;
-pub type Statements = Vec<Box<Statement>>;
+pub type Statements = Option<Vec<Box<Statement>>>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {

@@ -230,7 +230,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	}
 
 	self.skip_syntax(Token::RParen);
-	Some(parameters)	
+	if parameters.is_empty() { None } else { Some(parameters) }
     }
 
     fn parse_block(&mut self) -> Option<Statement> {
@@ -247,8 +247,9 @@ impl<'a, 'b> Parser<'a, 'b> {
 		}
 	    }
 	    self.skip_syntax(Token::RBrace);
-	    // TODO make statements an option to avoid empty vector
-	    Some(Statement::Block { statements: statements })
+	    Some(Statement::Block {
+		statements: (if statements.is_empty() { None } else { Some(statements) })
+	    })
 	} else {
 	    None
 	}
@@ -456,9 +457,9 @@ mod test {
 		    right: Box::new(Expression::Identifier("y".to_string()))
 		}),
 		consequence: Box::new(Statement::Block {
-		    statements: vec![
+		    statements: Some(vec![
 			Box::new(Statement::Expression { expression: Expression::Identifier("x".to_string()) })
-		    ]
+		    ])
 		}),
 		alternative: None
 	    }
@@ -477,14 +478,14 @@ mod test {
 		    right: Box::new(Expression::Identifier("y".to_string()))
 		}),
 		consequence: Box::new(Statement::Block {
-		    statements: vec![
+		    statements: Some(vec![
 			Box::new(Statement::Expression { expression: Expression::Identifier("x".to_string()) })
-		    ]
+		    ])
 		}),
 		alternative: Some(Box::new(Statement::Block {
-		    statements: vec![
+		    statements: Some(vec![
 			Box::new(Statement::Expression { expression: Expression::Identifier("y".to_string()) })
-		    ]
+		    ])
 		}))
 	    }
 	};
@@ -501,7 +502,7 @@ mod test {
 		    Box::new(Expression::Identifier("b".to_string()))
 		]),
 		body: Box::new(Statement::Block {
-		    statements: vec![
+		    statements: Some(vec![
 			Box::new(Statement::Expression {
 			   expression: Expression::Infix {
 				left: Box::new(Expression::Identifier("a".to_string())),
@@ -509,11 +510,39 @@ mod test {
 				right: Box::new(Expression::Identifier("b".to_string()))
 			   }
 			})
-		    ]
+		    ])
 		})
 	    }
 	};
 	assert_first_statement(program, statement);
+
+	let program_no_params = parse("fn() { a + b; }");
+	let statement_no_params = Statement::Expression {
+	    expression: Expression::Function {
+		parameters: None,
+		body: Box::new(Statement::Block {
+		    statements: Some(vec![
+			Box::new(Statement::Expression {
+			   expression: Expression::Infix {
+				left: Box::new(Expression::Identifier("a".to_string())),
+				operator: Token::Plus,
+				right: Box::new(Expression::Identifier("b".to_string()))
+			   }
+			})
+		    ])
+		})
+	    }
+	};
+	assert_first_statement(program_no_params, statement_no_params);
+
+	let program_no_body = parse("fn() {}");
+	let statement_no_body = Statement::Expression {
+	    expression: Expression::Function {
+		parameters: None,
+		body: Box::new(Statement::Block { statements: None })
+	    }
+	};
+	assert_first_statement(program_no_body, statement_no_body);
     }
 }
 
