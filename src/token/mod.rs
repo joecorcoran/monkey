@@ -3,8 +3,6 @@ pub enum Token {
     Identifier(String),
     Integer(String),
 
-    EOF,
-
     Assign,
     Plus,
     Minus,

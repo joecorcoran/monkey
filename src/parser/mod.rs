@@ -152,6 +152,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
 	    Some(Token::LParen) => self.parse_group(),
 	    Some(Token::If) => self.parse_if(),
+	    Some(Token::Function) => self.parse_function(),
 	    Some(Token::Bang) | Some(Token::Minus) => {
 		let operator = self.next().unwrap();
 		if let Some(right) = self.parse_expression(Precedence::Prefix) {
@@ -188,20 +189,66 @@ impl<'a, 'b> Parser<'a, 'b> {
 	}
     }
 
-    fn parse_block(&mut self) -> Option<Statement> {
-	if Some(Token::LBrace) == self.next() {
-	    let mut statements: Vec<Box<Statement>> = vec![];
-	    while let Some(t) = self.peek() {
-		if t == Token::RBrace { break }
-		if let Some(statement) = self.parse_statement() {
-		    statements.push(Box::new(statement));
-		}
-	    }
-	    if Some(Token::RBrace) == self.next() {
-		Some(Statement::Block { statements: statements })
+    fn parse_function(&mut self) -> Option<Expression> {
+	self.skip_syntax(Token::Function);
+
+	if Some(Token::LParen) == self.peek() {
+	    let parameters = self.parse_parameters();
+	    if let Some(block) = self.parse_block() {
+		Some(Expression::Function {
+		    parameters: parameters,
+		    body: Box::new(block)
+		})
 	    } else {
 		None
 	    }
+	} else {
+	    None
+	}
+    }
+
+    fn parse_parameters(&mut self) -> Parameters {
+	self.skip_syntax(Token::LParen);
+
+	let mut parameters: Vec<Box<Expression>> = vec![];
+	while let Some(token) = self.peek() {
+	    match token {
+		Token::RParen => break,
+		Token::Comma => {
+		    self.next();
+		    continue
+		},
+		_ => {
+		    if let Some(parameter) = self.parse_identifier() {
+			parameters.push(Box::new(parameter));
+		    } else {
+			self.peek_error(Token::Identifier("*".to_string()));
+			return None
+		    }
+		}
+	    }
+	}
+
+	self.skip_syntax(Token::RParen);
+	Some(parameters)	
+    }
+
+    fn parse_block(&mut self) -> Option<Statement> {
+	if Some(Token::LBrace) == self.next() {
+	    let mut statements: Vec<Box<Statement>> = vec![];
+	    while let Some(token) = self.peek() {
+		match token {
+		    Token::RBrace => break,
+		    _ => {
+			if let Some(statement) = self.parse_statement() {
+			    statements.push(Box::new(statement));
+			}
+		    }
+		}
+	    }
+	    self.skip_syntax(Token::RBrace);
+	    // TODO make statements an option to avoid empty vector
+	    Some(Statement::Block { statements: statements })
 	} else {
 	    None
 	}
@@ -439,6 +486,31 @@ mod test {
 			Box::new(Statement::Expression { expression: Expression::Identifier("y".to_string()) })
 		    ]
 		}))
+	    }
+	};
+	assert_first_statement(program, statement);
+    }
+
+    #[test]
+    fn function_definition() {
+	let program = parse("fn(a, b) { a + b; }");
+	let statement = Statement::Expression {
+	    expression: Expression::Function {
+		parameters: Some(vec![
+		    Box::new(Expression::Identifier("a".to_string())),
+		    Box::new(Expression::Identifier("b".to_string()))
+		]),
+		body: Box::new(Statement::Block {
+		    statements: vec![
+			Box::new(Statement::Expression {
+			   expression: Expression::Infix {
+				left: Box::new(Expression::Identifier("a".to_string())),
+				operator: Token::Plus,
+				right: Box::new(Expression::Identifier("b".to_string()))
+			   }
+			})
+		    ]
+		})
 	    }
 	};
 	assert_first_statement(program, statement);
