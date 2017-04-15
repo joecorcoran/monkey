@@ -10,6 +10,7 @@ mod parser;
 mod token;
 
 use lexer::Lexer;
+use parser::Parser;
 
 fn main() {
     let mut rl = rustyline::Editor::<()>::new();
@@ -19,7 +20,11 @@ fn main() {
 	    Ok(line) => {
 		if line == "exit" { break; }
 		let mut lexer = Lexer::new(&line);
-		println!("{:?}", lexer.tokenize());
+		let mut parser = Parser::new(&mut lexer);
+		match parser.parse() {
+		    Ok(program) => println!("{:?}", program),
+		    Err(error) => println!("Error: {}", error)
+		}
 	    },
 	    Err(_)   => println!("No input"),
 	}

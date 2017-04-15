@@ -27,8 +27,20 @@ impl<'a, 'b> Iterator for Parser<'a, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    fn new(lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
+    pub fn new(lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
         Parser { lexer: lexer, errors: vec![] }
+    }
+
+    pub fn parse(&mut self) -> Result<Program, String> {
+	let mut program = Program::new();
+	while let Some(statement) = self.parse_statement() {
+	    program.add(statement);
+	}
+	if self.errors.len() > 0 {
+	    Err(self.errors.join(", "))
+	} else {
+	    Ok(program)
+	}
     }
 
     fn token_precedence(token: &Token) -> Precedence {
@@ -67,18 +79,6 @@ impl<'a, 'b> Parser<'a, 'b> {
     fn end_statement(&mut self) {
 	if Some(Token::Semicolon) == self.peek() {
 	    self.next();
-	}
-    }
-
-    fn parse(&mut self) -> Result<Program, String> {
-	let mut program = Program::new();
-	while let Some(statement) = self.parse_statement() {
-	    program.add(statement);
-	}
-	if self.errors.len() > 0 {
-	    Err(self.errors.join(", "))
-	} else {
-	    Ok(program)
 	}
     }
 
