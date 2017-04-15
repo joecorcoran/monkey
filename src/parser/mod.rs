@@ -33,11 +33,11 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn token_precedence(token: &Token) -> Precedence {
 	match *token {
-	    Token::Equal | Token::NotEqual => Precedence::Equal,
-	    Token::Lt | Token::Gt          => Precedence::LtGt,
-	    Token::Plus | Token::Minus     => Precedence::Sum,
-	    Token::Slash | Token::Asterisk => Precedence::Product,
 	    Token::LParen                  => Precedence::Call,
+	    Token::Slash | Token::Asterisk => Precedence::Product,
+	    Token::Plus | Token::Minus     => Precedence::Sum,
+	    Token::Lt | Token::Gt          => Precedence::LtGt,
+	    Token::Equal | Token::NotEqual => Precedence::Equal,
 	    _                              => Precedence::Lowest
 	}
     }
@@ -70,9 +70,15 @@ impl<'a, 'b> Parser<'a, 'b> {
 	}
     }
 
-    fn parse(&mut self, program: &mut Program) {
+    fn parse(&mut self) -> Result<Program, String> {
+	let mut program = Program::new();
 	while let Some(statement) = self.parse_statement() {
 	    program.add(statement);
+	}
+	if self.errors.len() > 0 {
+	    Err(self.errors.join(", "))
+	} else {
+	    Ok(program)
 	}
     }
 
@@ -145,7 +151,6 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
-	// ident int bang minus true false lparen if fn
 	match self.peek() {
 	    Some(Token::Identifier(_)) => self.parse_identifier(),
 	    Some(Token::Integer(_)) => self.parse_integer(),
@@ -169,7 +174,6 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_infix_expression(&mut self, left: Box<Expression>) -> Option<Expression> {
-	// plus minus slash asterisk eq noteq lt gt lparen
 	match self.peek() {
 	    Some(Token::Plus) | Some(Token::Minus) | Some(Token::Slash) | Some(Token::Asterisk) |
 	    Some(Token::Equal) | Some(Token::NotEqual) | Some(Token::Lt) | Some(Token::Gt) => {
@@ -185,8 +189,39 @@ impl<'a, 'b> Parser<'a, 'b> {
 		    None
 		}
 	    },
+	    Some(Token::LParen) => self.parse_call(left),
 	    _ => None
 	}
+    }
+
+    fn parse_call(&mut self, function: Box<Expression>) -> Option<Expression> {
+	self.skip_syntax(Token::LParen);
+
+	let mut args: Vec<Box<Expression>> = vec![];
+	while let Some(token) = self.peek() {
+	    match token {
+		Token::RParen => break,
+		Token::Comma => {
+		    self.next();
+		    continue
+		},
+		_ => {
+		    if let Some(arg) = self.parse_expression(Precedence::Lowest) {
+			args.push(Box::new(arg));
+		    } else {
+			self.peek_error(Token::Identifier("*".to_string()));
+			return None
+		    }
+		}
+	    }
+	}
+
+	self.skip_syntax(Token::RParen);
+
+	Some(Expression::Call {
+	    function: function,
+	    arguments: if args.is_empty() { None } else { Some(args) }
+	})
     }
 
     fn parse_function(&mut self) -> Option<Expression> {
@@ -323,12 +358,11 @@ mod test {
     fn parse(input: &str) -> Program {
 	let mut lexer = Lexer::new(input);
 	let mut parser = Parser::new(&mut lexer);
-	let mut program = Program::new();
-	parser.parse(&mut program);
-	if parser.errors.len() > 0 {
-	    panic!("Parser error: {:?}", parser.errors);
+	let program = parser.parse();
+	match program {
+	    Ok(p) => p,
+	    Err(e) => panic!("Parse error(s): {}", e)
 	}
-	program
     }
 
     fn assert_first_statement(program: Program, statement: Statement) {
@@ -543,6 +577,30 @@ mod test {
 	    }
 	};
 	assert_first_statement(program_no_body, statement_no_body);
+    }
+
+    #[test]
+    fn call() {
+	let program = parse("myfunc(foo, 1)");
+	let statement = Statement::Expression {
+	    expression: Expression::Call {
+		function: Box::new(Expression::Identifier("myfunc".to_string())),
+		arguments: Some(vec![
+		    Box::new(Expression::Identifier("foo".to_string())),
+		    Box::new(Expression::Integer(1))
+		])
+	    }
+	};
+	assert_first_statement(program, statement);
+
+	let program_no_args = parse("myfunc()");
+	let statement_no_args = Statement::Expression {
+	    expression: Expression::Call {
+		function: Box::new(Expression::Identifier("myfunc".to_string())),
+		arguments: None
+	    }
+	};
+	assert_first_statement(program_no_args, statement_no_args);
     }
 }
 
