@@ -107,14 +107,6 @@ impl<'a> Lexer<'a> {
         self.index = current_index;
         token
     }
-
-    pub fn tokenize(&mut self) -> Vec<Token> {
-        let mut result = vec![];
-        while let Some(token) = self.next_token() {
-            result.push(token);
-        }
-        result
-    }
 }
 
 #[cfg(test)]

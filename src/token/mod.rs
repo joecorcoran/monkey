@@ -33,6 +33,17 @@ pub enum Token {
     Return
 }
 
+#[derive(PartialEq, PartialOrd)]
+pub enum Precedence {
+    Lowest,
+    Equal,
+    LtGt,
+    Sum,
+    Product,
+    Prefix,
+    Call
+}
+
 pub fn lookup<S: Into<String>>(identifier: S) -> Token {
     let id = identifier.into();
     match id.as_ref() {
@@ -66,5 +77,16 @@ pub fn lookup<S: Into<String>>(identifier: S) -> Token {
         "return" => Token::Return,
 
         _ => Token::Identifier(id)
+    }
+}
+
+pub fn precedence(token: &Token) -> Precedence {
+    match *token {
+        Token::LParen                  => Precedence::Call,
+        Token::Slash | Token::Asterisk => Precedence::Product,
+        Token::Plus | Token::Minus     => Precedence::Sum,
+        Token::Lt | Token::Gt          => Precedence::LtGt,
+        Token::Equal | Token::NotEqual => Precedence::Equal,
+        _                              => Precedence::Lowest
     }
 }

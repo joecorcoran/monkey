@@ -1,17 +1,7 @@
 use ast::*;
 use lexer::Lexer;
-use token::Token;
-
-#[derive(PartialEq, PartialOrd)]
-enum Precedence {
-    Lowest,
-    Equal,
-    LtGt,
-    Sum,
-    Product,
-    Prefix,
-    Call
-}
+use token;
+use token::{Token, Precedence};
 
 pub struct Parser<'a, 'b: 'a> {
     lexer: &'a mut Lexer<'b>,
@@ -40,17 +30,6 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Err(self.errors.join(", "))
 	} else {
 	    Ok(program)
-	}
-    }
-
-    fn token_precedence(token: &Token) -> Precedence {
-	match *token {
-	    Token::LParen                  => Precedence::Call,
-	    Token::Slash | Token::Asterisk => Precedence::Product,
-	    Token::Plus | Token::Minus     => Precedence::Sum,
-	    Token::Lt | Token::Gt          => Precedence::LtGt,
-	    Token::Equal | Token::NotEqual => Precedence::Equal,
-	    _                              => Precedence::Lowest
 	}
     }
 
@@ -139,7 +118,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	if let Some(mut left) = self.parse_prefix_expression() {
 	    while let Some(t) = self.peek() {
 		if t == Token::Semicolon { break }
-		if precedence >= Self::token_precedence(&t) { break }
+		if precedence >= token::precedence(&t) { break }
 		if let Some(infix) = self.parse_infix_expression(Box::new(left.clone())) {
 		    left = infix;
 		}
@@ -178,7 +157,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Token::Plus) | Some(Token::Minus) | Some(Token::Slash) | Some(Token::Asterisk) |
 	    Some(Token::Equal) | Some(Token::NotEqual) | Some(Token::Lt) | Some(Token::Gt) => {
 		let operator = self.next().unwrap();
-		let precedence = Self::token_precedence(&operator);
+		let precedence = token::precedence(&operator);
 		if let Some(right) = self.parse_expression(precedence) {
 		    Some(Expression::Infix {
 			left: left,
@@ -375,7 +354,7 @@ mod test {
     }
 
     #[test]
-    fn parse_let() {
+    fn let_statement() {
 	let program = parse("let foo = 1;");
 	let statement = Statement::Let {
 	    identifier: Expression::Identifier("foo".to_string()),
@@ -385,22 +364,25 @@ mod test {
     }
 
     #[test]
-    fn parse_return() {
+    fn return_statement() {
 	let program = parse("return 1;");
 	let statement = Statement::Return { expression: Expression::Integer(1) };
 	assert_first_statement(program, statement);
     }
 
     #[test]
-    fn parse_identifier() {
+    fn identifier() {
 	let program = parse("foo;");
 	assert_first_statement(program, Statement::Expression { expression: Expression::Identifier("foo".to_string()) });
     }
 
     #[test]
-    fn parse_boolean() {
-	let program = parse("true;");
-	assert_first_statement(program, Statement::Expression { expression: Expression::Boolean(true) });
+    fn boolean() {
+	let program_true = parse("true;");
+	assert_first_statement(program_true, Statement::Expression { expression: Expression::Boolean(true) });
+
+	let program_false = parse("false;");
+	assert_first_statement(program_false, Statement::Expression { expression: Expression::Boolean(false) });
     }
 
     #[test]
