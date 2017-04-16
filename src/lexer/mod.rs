@@ -57,10 +57,10 @@ impl<'a> Lexer<'a> {
 
     fn take_numeric(&mut self) -> String {
         let mut num = vec![];
-        while Self::is_numeric(self.peek().unwrap_or("")) {
-            match self.next() {
-                Some(g) => num.push(g),
-                None => break
+        while let Some(g) = self.peek() {
+            match g {
+                g if Self::is_numeric(g) => num.push(self.next().unwrap()),
+                _ => break
             }
         }
         num.concat()
