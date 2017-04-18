@@ -8,10 +8,9 @@ const NULL: Object = Object::Null;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    Error,
-    IllegalOperator,
-    NoInput,
-    NotImplemented
+    NotImplemented,
+    TypeMismatch(Object, Object),
+    UnknownOperator
 }
 
 type EvalResult = Result<Object, Error>;
@@ -25,7 +24,14 @@ impl Eval for Program {
 	let mut result = Ok(NULL);
 	for s in &self.statements {
 	    result = s.eval();
-	    if result.is_err() { break }
+	    match result {
+		Err(_) => break,
+		Ok(Object::Return(v)) => {
+		    result = Ok(*v);
+		    break
+		},
+		_ => continue
+	    }
 	}
 	result
     }
@@ -41,11 +47,20 @@ impl Eval for Statement {
 			let mut result = Ok(NULL);
 			for s in ss {
 			    result = s.eval();
-			    if result.is_err() { break }
+			    match result {
+				Ok(Object::Return(_)) | Err(_) => break,
+				_ => continue
+			    }
 			}
 			result
 		    },
 		    None => Ok(NULL)
+		}
+	    },
+	    Statement::Return { expression: ref e } => {
+		match e.eval() {
+		    Ok(v) => Ok(Object::Return(Box::new(v))),
+		    err => err
 		}
 	    },
 	    _ => Err(Error::NotImplemented)
@@ -88,7 +103,7 @@ fn eval_bang_prefix(object: Object) -> EvalResult {
 fn eval_minus_prefix(object: Object) -> EvalResult {
     match object {
 	Object::Integer(i) => Ok(Object::Integer(-i as i32)),
-	_ => Err(Error::IllegalOperator)
+	_ => Err(Error::UnknownOperator)
     }
 }
 
@@ -101,7 +116,7 @@ fn eval_infix(left: &Box<Expression>, operator: &Token, right: &Box<Expression>)
     match (left_value.unwrap(), right_value.unwrap()) {
 	(Object::Integer(l), Object::Integer(r)) => eval_integer_infix(l, operator, r),
 	(Object::Boolean(l), Object::Boolean(r)) => eval_boolean_infix(l, operator, r),
-	_ => Err(Error::NotImplemented)
+	(l, r) => Err(Error::TypeMismatch(l, r))
     }
 }
 
@@ -115,7 +130,7 @@ fn eval_integer_infix(left: i32, operator: &Token, right: i32) -> EvalResult {
 	Token::NotEqual => Ok(boolean(left != right)),
 	Token::Gt       => Ok(boolean(left > right)),
 	Token::Lt       => Ok(boolean(left < right)),
-	_               => Err(Error::IllegalOperator)
+	_               => Err(Error::UnknownOperator)
     }
 }
 
@@ -123,7 +138,7 @@ fn eval_boolean_infix(left: bool, operator: &Token, right: bool) -> EvalResult {
     match *operator {
 	Token::Equal    => Ok(boolean(left == right)),
 	Token::NotEqual => Ok(boolean(left != right)),
-	_               => Err(Error::IllegalOperator)
+	_               => Err(Error::UnknownOperator)
     }
 }
 
@@ -221,7 +236,7 @@ mod test {
 		}
 	    ]
 	};
-	let expected_err = Err(Error::IllegalOperator);
+	let expected_err = Err(Error::UnknownOperator);
 	assert_eq!(expected_err, program_err.eval());
     }
 
@@ -302,6 +317,41 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(20));
+	assert_eq!(expected, program.eval());
+    }
+
+    #[test]
+    fn return_statement() {
+	let program = Program {
+	    statements: vec![
+		Statement::Return { expression: Expression::Integer(10) },
+		Statement::Expression { expression: Expression::Integer(9) }
+	    ]
+	};
+	let expected = Ok(Object::Integer(10));
+	assert_eq!(expected, program.eval());
+    }
+
+    #[test]
+    fn return_statement_bubbling() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::If {
+			condition: Box::new(Expression::Boolean(true)),
+			consequence: Box::new(Statement::Block {
+			    statements: Some(vec![
+				Box::new(Statement::Return { expression: Expression::Integer(10) }),
+				Box::new(Statement::Expression { expression: Expression::Integer(9) })
+			    ])
+			}),
+			alternative: None
+		    }
+		},
+		Statement::Return { expression: Expression::Integer(8) }
+	    ]
+	};
+	let expected = Ok(Object::Integer(10));
 	assert_eq!(expected, program.eval());
     }
 }

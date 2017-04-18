@@ -5,7 +5,7 @@ extern crate std_unicode;
 extern crate unicode_segmentation;
 
 mod ast;
-mod eval;
+mod engine;
 mod lexer;
 mod object;
 mod parser;
@@ -13,7 +13,7 @@ mod token;
 
 use lexer::Lexer;
 use parser::Parser;
-use eval::Eval;
+use engine::Eval;
 
 fn main() {
     let mut rl = rustyline::Editor::<()>::new();

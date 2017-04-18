@@ -1,6 +1,7 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum Object {
-    Integer(i32),
     Boolean(bool),
-    Null
+    Integer(i32),
+    Null,
+    Return(Box<Object>)
 }
