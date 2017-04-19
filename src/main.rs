@@ -13,10 +13,16 @@ mod token;
 
 use lexer::Lexer;
 use parser::Parser;
-use engine::Eval;
+use engine::{Env, Eval};
 
 fn main() {
+    // TODO switch on argv between running file/stdin and repl
+    repl()
+}
+
+fn repl() {
     let mut rl = rustyline::Editor::<()>::new();
+    let mut env = Env::new(None);
     loop {
 	let readline = rl.readline(">> ");
 	match readline {
@@ -25,7 +31,7 @@ fn main() {
 		let mut lexer = Lexer::new(&line);
 		let mut parser = Parser::new(&mut lexer);
 		match parser.parse() {
-		    Ok(program) => println!("{:?}", program.eval()),
+		    Ok(program) => println!("{:?}", program.eval(&mut env)),
 		    Err(error) => println!("Error: {}", error)
 		}
 	    },

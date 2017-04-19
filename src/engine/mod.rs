@@ -2,6 +2,8 @@ use ast::{Program, Statement, Expression};
 use object::Object;
 use token::Token;
 
+pub use object::Env;
+
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
 const NULL: Object = Object::Null;
@@ -16,14 +18,14 @@ pub enum Error {
 type EvalResult = Result<Object, Error>;
 
 pub trait Eval {
-    fn eval(&self) -> EvalResult;
+    fn eval(&self, env: &mut Env) -> EvalResult;
 }
 
 impl Eval for Program {
-    fn eval(&self) -> EvalResult {
+    fn eval(&self, env: &mut Env) -> EvalResult {
 	let mut result = Ok(NULL);
 	for s in &self.statements {
-	    result = s.eval();
+	    result = s.eval(env);
 	    match result {
 		Err(_) => break,
 		Ok(Object::Return(v)) => {
@@ -38,15 +40,15 @@ impl Eval for Program {
 }
 
 impl Eval for Statement {
-    fn eval(&self) -> EvalResult {
+    fn eval(&self, env: &mut Env) -> EvalResult {
 	match *self {
-	    Statement::Expression { expression: ref e } => e.eval(),
+	    Statement::Expression { expression: ref e } => e.eval(env),
 	    Statement::Block { statements: ref ss } => {
 		match *ss {
 		    Some(ref ss) => {
 			let mut result = Ok(NULL);
 			for s in ss {
-			    result = s.eval();
+			    result = s.eval(env);
 			    match result {
 				Ok(Object::Return(_)) | Err(_) => break,
 				_ => continue
@@ -58,7 +60,7 @@ impl Eval for Statement {
 		}
 	    },
 	    Statement::Return { expression: ref e } => {
-		match e.eval() {
+		match e.eval(env) {
 		    Ok(v) => Ok(Object::Return(Box::new(v))),
 		    err => err
 		}
@@ -69,20 +71,20 @@ impl Eval for Statement {
 }
 
 impl Eval for Expression {
-    fn eval(&self) -> EvalResult {
+    fn eval(&self, env: &mut Env) -> EvalResult {
 	match *self {
 	    Expression::Integer(i) => Ok(Object::Integer(i as i32)),
 	    Expression::Boolean(b) => Ok(if b { TRUE } else { FALSE }),
-	    Expression::Prefix { operator: ref o, right: ref r } => eval_prefix(o, r),
-	    Expression::Infix { left: ref l, operator: ref o, right: ref r } => eval_infix(l, o, r),
-	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(c, cq, a),
+	    Expression::Prefix { operator: ref o, right: ref r } => eval_prefix(env, o, r),
+	    Expression::Infix { left: ref l, operator: ref o, right: ref r } => eval_infix(env, l, o, r),
+	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(env, c, cq, a),
 	    _ => Err(Error::NotImplemented)
 	}
     }
 }
 
-fn eval_prefix(operator: &Token, right: &Box<Expression>) -> EvalResult {
-    let value = right.eval();
+fn eval_prefix(env: &mut Env, operator: &Token, right: &Box<Expression>) -> EvalResult {
+    let value = right.eval(env);
     if value.is_err() { return value }
     match *operator {
 	Token::Bang => eval_bang_prefix(value.unwrap()),
@@ -107,10 +109,10 @@ fn eval_minus_prefix(object: Object) -> EvalResult {
     }
 }
 
-fn eval_infix(left: &Box<Expression>, operator: &Token, right: &Box<Expression>) -> EvalResult {
-    let left_value = left.eval();
+fn eval_infix(env: &mut Env, left: &Box<Expression>, operator: &Token, right: &Box<Expression>) -> EvalResult {
+    let left_value = left.eval(env);
     if left_value.is_err() { return left_value }
-    let right_value = right.eval();
+    let right_value = right.eval(env);
     if right_value.is_err() { return right_value }
 
     match (left_value.unwrap(), right_value.unwrap()) {
@@ -142,14 +144,14 @@ fn eval_boolean_infix(left: bool, operator: &Token, right: bool) -> EvalResult {
     }
 }
 
-fn eval_if(condition: &Box<Expression>, consequence: &Box<Statement>, alternative: &Option<Box<Statement>>) -> EvalResult {
-    let condition_value = condition.eval();
+fn eval_if(env: &mut Env, condition: &Box<Expression>, consequence: &Box<Statement>, alternative: &Option<Box<Statement>>) -> EvalResult {
+    let condition_value = condition.eval(env);
     if condition_value.is_err() { return condition_value }
     if truthy(condition_value.unwrap()) {
-	consequence.eval()
+	consequence.eval(env)
     } else {
 	match *alternative {
-	    Some(ref a) => a.eval(),
+	    Some(ref a) => a.eval(env),
 	    None => Ok(NULL)
 	}
     }
@@ -181,7 +183,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(1));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -192,7 +194,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Boolean(false));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -208,7 +210,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Boolean(false));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -224,7 +226,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(-2));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
 
 	let program_err = Program {
 	    statements: vec![
@@ -237,7 +239,7 @@ mod test {
 	    ]
 	};
 	let expected_err = Err(Error::UnknownOperator);
-	assert_eq!(expected_err, program_err.eval());
+	assert_eq!(expected_err, program_err.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -254,7 +256,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(3));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -271,7 +273,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Boolean(false));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -292,7 +294,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -317,7 +319,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(20));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -329,7 +331,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 
     #[test]
@@ -352,6 +354,6 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval());
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
     }
 }
