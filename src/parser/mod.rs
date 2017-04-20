@@ -65,6 +65,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	match self.peek() {
 	    Some(Token::Let) => self.parse_statement_let(),
 	    Some(Token::Return) => self.parse_statement_return(),
+	    Some(Token::LBrace) => self.parse_statement_block(),
 	    Some(_) => self.parse_statement_expression(),
 	    None => None
 	}
@@ -101,6 +102,28 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Statement::Return { expression: expression })
 	} else {
 	    self.parse_error();
+	    None
+	}
+    }
+
+    fn parse_statement_block(&mut self) -> Option<Statement> {
+	if Some(Token::LBrace) == self.next() {
+	    let mut statements: Vec<Box<Statement>> = vec![];
+	    while let Some(token) = self.peek() {
+		match token {
+		    Token::RBrace => break,
+		    _ => {
+			if let Some(statement) = self.parse_statement() {
+			    statements.push(Box::new(statement));
+			}
+		    }
+		}
+	    }
+	    self.skip_syntax(Token::RBrace);
+	    Some(Statement::Block {
+		statements: (if statements.is_empty() { None } else { Some(statements) })
+	    })
+	} else {
 	    None
 	}
     }
@@ -208,7 +231,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
 	if Some(Token::LParen) == self.peek() {
 	    let parameters = self.parse_parameters();
-	    if let Some(block) = self.parse_block() {
+	    if let Some(block) = self.parse_statement_block() {
 		Some(Expression::Function {
 		    parameters: parameters,
 		    body: Box::new(block)
@@ -247,28 +270,6 @@ impl<'a, 'b> Parser<'a, 'b> {
 	if parameters.is_empty() { None } else { Some(parameters) }
     }
 
-    fn parse_block(&mut self) -> Option<Statement> {
-	if Some(Token::LBrace) == self.next() {
-	    let mut statements: Vec<Box<Statement>> = vec![];
-	    while let Some(token) = self.peek() {
-		match token {
-		    Token::RBrace => break,
-		    _ => {
-			if let Some(statement) = self.parse_statement() {
-			    statements.push(Box::new(statement));
-			}
-		    }
-		}
-	    }
-	    self.skip_syntax(Token::RBrace);
-	    Some(Statement::Block {
-		statements: (if statements.is_empty() { None } else { Some(statements) })
-	    })
-	} else {
-	    None
-	}
-    }
-
     fn parse_if(&mut self) -> Option<Expression> {
 	self.skip_syntax(Token::If);
 	self.skip_syntax(Token::LParen);
@@ -276,9 +277,9 @@ impl<'a, 'b> Parser<'a, 'b> {
 	if let Some(condition) = self.parse_expression(Precedence::Lowest) {
 	    self.skip_syntax(Token::RParen);    
 
-	    if let Some(consequence) = self.parse_block() {
+	    if let Some(consequence) = self.parse_statement_block() {
 		self.skip_syntax(Token::Else);
-		let alternative = self.parse_block().and_then(|b| Some(Box::new(b)));
+		let alternative = self.parse_statement_block().and_then(|b| Some(Box::new(b)));
 		Some(Expression::If {
 		    condition: Box::new(condition),
 		    consequence: Box::new(consequence),

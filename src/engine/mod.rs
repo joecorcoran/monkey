@@ -2,7 +2,8 @@ use ast::{Program, Statement, Expression};
 use object::Object;
 use token::Token;
 
-pub use object::Env;
+mod env;
+pub use self::env::Env;
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
