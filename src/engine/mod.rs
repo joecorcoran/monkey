@@ -11,6 +11,7 @@ const NULL: Object = Object::Null;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    DivisionByZero,
     IdentifierNotFound(String),
     NotImplemented,
     TypeMismatch(Object, Object),
@@ -148,7 +149,12 @@ fn eval_integer_infix(left: i32, operator: &Token, right: i32) -> EvalResult {
 	Token::Plus     => Ok(Object::Integer(left + right)),
 	Token::Minus    => Ok(Object::Integer(left - right)),
 	Token::Asterisk => Ok(Object::Integer(left * right)),
-	Token::Slash    => Ok(Object::Integer(left / right)),
+	Token::Slash    => {
+	    match right {
+		0 => Err(Error::DivisionByZero),
+		_ => Ok(Object::Integer(left / right))
+	    }
+	},
 	Token::Equal    => Ok(boolean(left == right)),
 	Token::NotEqual => Ok(boolean(left != right)),
 	Token::Gt       => Ok(boolean(left > right)),
