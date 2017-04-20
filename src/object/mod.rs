@@ -1,7 +1,7 @@
 use std::collections::btree_map::BTreeMap;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Object {
     Boolean(bool),
     Env(Env),
@@ -12,7 +12,7 @@ pub enum Object {
 
 type OuterEnv = Option<Rc<Env>>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Env {
     bindings: BTreeMap<String, Object>,
     outer: OuterEnv
@@ -34,7 +34,9 @@ impl Env {
 	}
     }
 
-    pub fn set(&mut self, key: String, value: Object) -> Option<Object> {
-	self.bindings.insert(key, value)
+    pub fn set(&mut self, key: String, value: Object) -> Object {
+	let ret = value.to_owned();
+	self.bindings.insert(key, value);
+	ret
     }
 }

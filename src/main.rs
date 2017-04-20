@@ -31,7 +31,14 @@ fn repl() {
 		let mut lexer = Lexer::new(&line);
 		let mut parser = Parser::new(&mut lexer);
 		match parser.parse() {
-		    Ok(program) => println!("{:?}", program.eval(&mut env)),
+		    Ok(ast) => {
+			let result = ast.eval(&mut env);
+			match result {
+			    // TODO implement proper printing for all primitives
+			    Ok(object) => println!("{:?}", object),
+			    Err(error) => println!("Error: {:?}", error)
+			}
+		    },
 		    Err(error) => println!("Error: {}", error)
 		}
 	    },

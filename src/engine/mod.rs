@@ -10,6 +10,7 @@ const NULL: Object = Object::Null;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    IdentifierNotFound(String),
     NotImplemented,
     TypeMismatch(Object, Object),
     UnknownOperator
@@ -65,7 +66,17 @@ impl Eval for Statement {
 		    err => err
 		}
 	    },
-	    _ => Err(Error::NotImplemented)
+	    Statement::Let { identifier: ref id, expression: ref e } => {
+		if let &Expression::Identifier(ref key) = id {
+		    let value = e.eval(env);
+		    match value {
+			Ok(object) => Ok(env.set(key.to_owned(), object)),
+			Err(error) => Err(error)
+		    }
+		} else {
+		    unreachable!()
+		}
+	    }
 	}
     }
 }
@@ -73,6 +84,7 @@ impl Eval for Statement {
 impl Eval for Expression {
     fn eval(&self, env: &mut Env) -> EvalResult {
 	match *self {
+	    Expression::Identifier(ref i) => eval_identifier(env, i),
 	    Expression::Integer(i) => Ok(Object::Integer(i as i32)),
 	    Expression::Boolean(b) => Ok(if b { TRUE } else { FALSE }),
 	    Expression::Prefix { operator: ref o, right: ref r } => eval_prefix(env, o, r),
@@ -80,6 +92,14 @@ impl Eval for Expression {
 	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(env, c, cq, a),
 	    _ => Err(Error::NotImplemented)
 	}
+    }
+}
+
+fn eval_identifier(env: &mut Env, name: &String) -> EvalResult {
+    if let Some(object) = env.get(name) {
+	Ok(object.to_owned())
+    } else {
+	Err(Error::IdentifierNotFound(name.to_owned()))
     }
 }
 
@@ -351,6 +371,21 @@ mod test {
 		    }
 		},
 		Statement::Return { expression: Expression::Integer(8) }
+	    ]
+	};
+	let expected = Ok(Object::Integer(10));
+	assert_eq!(expected, program.eval(&mut Env::new(None)));
+    }
+
+    #[test]
+    fn let_binding() {
+	let program = Program {
+	    statements: vec![
+		Statement::Let {
+		    identifier: Expression::Identifier("foo".to_string()),
+		    expression: Expression::Integer(10)
+		},
+		Statement::Expression { expression: Expression::Identifier("foo".to_string()) }
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
