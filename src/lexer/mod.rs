@@ -75,6 +75,7 @@ impl<'a> Lexer<'a> {
             },
             // Comparators
             Some("!") | Some("=") => {
+                // TODO this is too greedy, e.g. !!1 and 1======1
                 let mut result = vec![self.next().unwrap()];
                 match self.peek() {
                     Some("!") | Some("=") => {

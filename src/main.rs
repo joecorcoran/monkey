@@ -12,6 +12,7 @@ mod parser;
 mod token;
 
 use lexer::Lexer;
+use object::Object;
 use parser::Parser;
 use engine::{Env, Eval};
 
@@ -22,7 +23,7 @@ fn main() {
 
 fn repl() {
     let mut rl = rustyline::Editor::<()>::new();
-    let mut env = Env::new(None);
+    let env = Env::env_ref(None);
     loop {
 	let readline = rl.readline(">> ");
 	match readline {
@@ -32,10 +33,10 @@ fn repl() {
 		let mut parser = Parser::new(&mut lexer);
 		match parser.parse() {
 		    Ok(ast) => {
-			let result = ast.eval(&mut env);
+			let result = ast.eval(env.clone());
 			match result {
 			    // TODO implement proper printing for all primitives
-			    Ok(object) => println!("{:?}", object),
+			    Ok(object) => print_object(object),
 			    Err(error) => println!("Error: {:?}", error)
 			}
 		    },
@@ -44,5 +45,15 @@ fn repl() {
 	    },
 	    Err(_)   => println!("No input"),
 	}
+    }
+}
+
+fn print_object(object: Object) {
+    match object {
+	Object::Integer(primitive) => println!("{}", primitive),
+	Object::Boolean(primitive) => println!("{}", primitive),
+	Object::Null => println!("null"),
+	Object::Function(_) => println!("(function)"),
+	obj => println!("{:?}", obj)
     }
 }

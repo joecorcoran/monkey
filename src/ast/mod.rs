@@ -4,7 +4,7 @@ pub type Arguments = Option<Vec<Box<Expression>>>;
 pub type Parameters = Option<Vec<Box<Expression>>>;
 pub type Statements = Option<Vec<Box<Statement>>>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Statement {
     Let { identifier: Expression, expression: Expression },
     Return { expression: Expression },
@@ -12,7 +12,7 @@ pub enum Statement {
     Block { statements: Statements }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expression {
     Identifier(String),
     Integer(usize),

@@ -1,9 +1,9 @@
 use ast::{Program, Statement, Expression};
-use object::Object;
+use object::{Object, Function};
 use token::Token;
 
 mod env;
-pub use self::env::Env;
+pub use self::env::{Env, EnvRef};
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
@@ -21,14 +21,14 @@ pub enum Error {
 type EvalResult = Result<Object, Error>;
 
 pub trait Eval {
-    fn eval(&self, env: &mut Env) -> EvalResult;
+    fn eval(&self, env: EnvRef) -> EvalResult;
 }
 
 impl Eval for Program {
-    fn eval(&self, env: &mut Env) -> EvalResult {
+    fn eval(&self, env: EnvRef) -> EvalResult {
 	let mut result = Ok(NULL);
 	for s in &self.statements {
-	    result = s.eval(env);
+	    result = s.eval(env.clone());
 	    match result {
 		Err(_) => break,
 		Ok(Object::Return(v)) => {
@@ -43,15 +43,15 @@ impl Eval for Program {
 }
 
 impl Eval for Statement {
-    fn eval(&self, env: &mut Env) -> EvalResult {
+    fn eval(&self, env: EnvRef) -> EvalResult {
 	match *self {
-	    Statement::Expression { expression: ref e } => e.eval(env),
+	    Statement::Expression { expression: ref e } => e.eval(env.clone()),
 	    Statement::Block { statements: ref ss } => {
 		match *ss {
 		    Some(ref ss) => {
 			let mut result = Ok(NULL);
 			for s in ss {
-			    result = s.eval(env);
+			    result = s.eval(env.clone());
 			    match result {
 				Ok(Object::Return(_)) | Err(_) => break,
 				_ => continue
@@ -63,17 +63,16 @@ impl Eval for Statement {
 		}
 	    },
 	    Statement::Return { expression: ref e } => {
-		match e.eval(env) {
+		match e.eval(env.clone()) {
 		    Ok(v) => Ok(Object::Return(Box::new(v))),
 		    err => err
 		}
 	    },
 	    Statement::Let { identifier: ref id, expression: ref e } => {
 		if let &Expression::Identifier(ref key) = id {
-		    let value = e.eval(env);
-		    match value {
-			Ok(object) => Ok(env.set(key.to_owned(), object)),
-			Err(error) => Err(error)
+		    match e.eval(env.clone()) {
+			Ok(value) => Ok(env.borrow_mut().set(key.to_owned(), value)),
+			Err(e) => Err(e)
 		    }
 		} else {
 		    unreachable!()
@@ -84,7 +83,7 @@ impl Eval for Statement {
 }
 
 impl Eval for Expression {
-    fn eval(&self, env: &mut Env) -> EvalResult {
+    fn eval(&self, env: EnvRef) -> EvalResult {
 	match *self {
 	    Expression::Identifier(ref i) => eval_identifier(env, i),
 	    Expression::Integer(i) => Ok(Object::Integer(i as i32)),
@@ -92,20 +91,47 @@ impl Eval for Expression {
 	    Expression::Prefix { operator: ref o, right: ref r } => eval_prefix(env, o, r),
 	    Expression::Infix { left: ref l, operator: ref o, right: ref r } => eval_infix(env, l, o, r),
 	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(env, c, cq, a),
+	    Expression::Function { parameters: ref p, body: ref b } => eval_function(env, p, b),
 	    _ => Err(Error::NotImplemented)
 	}
     }
 }
 
-fn eval_identifier(env: &mut Env, name: &String) -> EvalResult {
-    if let Some(object) = env.get(name) {
+fn eval_function(env: EnvRef, parameters: &Option<Vec<Box<Expression>>>, body: &Box<Statement>) -> EvalResult {
+    let p = match *parameters {
+	Some(ref ps) => {
+	    if ps.is_empty() {
+		None
+	    } else {
+		let mut result = vec![];
+		let mut iter = ps.iter();
+		while let Some(expression) = iter.next() {
+		    if let Expression::Identifier(ref i) = **expression {
+			result.push(i.to_owned());
+		    }
+		}
+		Some(result)
+	    }
+	},
+	None => None
+    };
+
+    Ok(Object::Function(Box::new(Function {
+	env: Env::new(Some(env.clone())),
+	parameters: p,
+	body: body.clone()
+    })))
+}
+
+fn eval_identifier(env: EnvRef, name: &String) -> EvalResult {
+    if let Some(object) = env.borrow().get(name) {
 	Ok(object.to_owned())
     } else {
 	Err(Error::IdentifierNotFound(name.to_owned()))
     }
 }
 
-fn eval_prefix(env: &mut Env, operator: &Token, right: &Box<Expression>) -> EvalResult {
+fn eval_prefix(env: EnvRef, operator: &Token, right: &Box<Expression>) -> EvalResult {
     let value = right.eval(env);
     if value.is_err() { return value }
     match *operator {
@@ -131,10 +157,10 @@ fn eval_minus_prefix(object: Object) -> EvalResult {
     }
 }
 
-fn eval_infix(env: &mut Env, left: &Box<Expression>, operator: &Token, right: &Box<Expression>) -> EvalResult {
-    let left_value = left.eval(env);
+fn eval_infix(env: EnvRef, left: &Box<Expression>, operator: &Token, right: &Box<Expression>) -> EvalResult {
+    let left_value = left.eval(env.clone());
     if left_value.is_err() { return left_value }
-    let right_value = right.eval(env);
+    let right_value = right.eval(env.clone());
     if right_value.is_err() { return right_value }
 
     match (left_value.unwrap(), right_value.unwrap()) {
@@ -171,11 +197,11 @@ fn eval_boolean_infix(left: bool, operator: &Token, right: bool) -> EvalResult {
     }
 }
 
-fn eval_if(env: &mut Env, condition: &Box<Expression>, consequence: &Box<Statement>, alternative: &Option<Box<Statement>>) -> EvalResult {
-    let condition_value = condition.eval(env);
+fn eval_if(env: EnvRef, condition: &Box<Expression>, consequence: &Box<Statement>, alternative: &Option<Box<Statement>>) -> EvalResult {
+    let condition_value = condition.eval(env.clone());
     if condition_value.is_err() { return condition_value }
     if truthy(condition_value.unwrap()) {
-	consequence.eval(env)
+	consequence.eval(env.clone())
     } else {
 	match *alternative {
 	    Some(ref a) => a.eval(env),
@@ -210,7 +236,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(1));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -221,7 +247,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Boolean(false));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -237,7 +263,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Boolean(false));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -253,7 +279,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(-2));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
 
 	let program_err = Program {
 	    statements: vec![
@@ -266,7 +292,7 @@ mod test {
 	    ]
 	};
 	let expected_err = Err(Error::UnknownOperator);
-	assert_eq!(expected_err, program_err.eval(&mut Env::new(None)));
+	assert_eq!(expected_err, program_err.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -283,7 +309,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(3));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -300,7 +326,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Boolean(false));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -321,7 +347,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -346,7 +372,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(20));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -358,7 +384,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -381,7 +407,7 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]
@@ -396,6 +422,27 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
-	assert_eq!(expected, program.eval(&mut Env::new(None)));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn function() {
+	let root = Env::env_ref(None);
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Function {
+			parameters: None,
+			body: Box::new(Statement::Block { statements: None })
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Function(Box::new(Function {
+	    env: Env::new(Some(root)),
+	    parameters: None,
+	    body: Box::new(Statement::Block { statements: None })
+	})));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 }
