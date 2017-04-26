@@ -1,4 +1,4 @@
-use ast::{Program, Statement, Expression};
+use ast::{Arguments, Expression, Parameters, Program, Statement};
 use object::{Object, Function};
 use token::Token;
 
@@ -11,9 +11,10 @@ const NULL: Object = Object::Null;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    ArgumentsCount(usize, usize),
     DivisionByZero,
     IdentifierNotFound(String),
-    NotImplemented,
+    NotAFunction,
     TypeMismatch(Object, Object),
     UnknownOperator
 }
@@ -92,12 +93,36 @@ impl Eval for Expression {
 	    Expression::Infix { left: ref l, operator: ref o, right: ref r } => eval_infix(env, l, o, r),
 	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(env, c, cq, a),
 	    Expression::Function { parameters: ref p, body: ref b } => eval_function(env, p, b),
-	    _ => Err(Error::NotImplemented)
+	    Expression::Call { function: ref f, arguments: ref a } => eval_call(env, f, a)
 	}
     }
 }
 
-fn eval_function(env: EnvRef, parameters: &Option<Vec<Box<Expression>>>, body: &Box<Statement>) -> EvalResult {
+fn eval_call(env: EnvRef, function: &Box<Expression>, arguments: &Arguments) -> EvalResult {
+    if let Ok(Object::Function(f)) = function.eval(env.clone()) {
+	let a = arguments.to_owned().unwrap_or(vec![]);
+	match f.parameters {
+	    Some(ref p) => {
+		if p.len() != a.len() { return Err(Error::ArgumentsCount(a.len(), p.len())); }
+		let mut args = a.iter().enumerate();
+		while let Some((i, arg)) = args.next() {
+		    if let Ok(obj) = arg.eval(env.clone()) {
+			let key = p.get(i).unwrap().to_owned();
+			f.env.borrow_mut().set(key, obj);
+		    }
+		}
+	    },
+	    None => {
+		if a.len() > 0 { return Err(Error::ArgumentsCount(a.len(), 0)); }
+	    }
+	}
+	f.body.eval(f.env.clone())
+    } else {
+	Err(Error::NotAFunction)
+    }
+}
+
+fn eval_function(env: EnvRef, parameters: &Parameters, body: &Box<Statement>) -> EvalResult {
     let p = match *parameters {
 	Some(ref ps) => {
 	    if ps.is_empty() {
@@ -117,7 +142,7 @@ fn eval_function(env: EnvRef, parameters: &Option<Vec<Box<Expression>>>, body: &
     };
 
     Ok(Object::Function(Box::new(Function {
-	env: Env::new(Some(env.clone())),
+	env: Env::env_ref(Some(env.clone())),
 	parameters: p,
 	body: body.clone()
     })))
@@ -426,7 +451,7 @@ mod test {
     }
 
     #[test]
-    fn function() {
+    fn function_primitive() {
 	let root = Env::env_ref(None);
 	let program = Program {
 	    statements: vec![
@@ -439,10 +464,41 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Function(Box::new(Function {
-	    env: Env::new(Some(root)),
+	    env: Env::env_ref(Some(root)),
 	    parameters: None,
 	    body: Box::new(Statement::Block { statements: None })
 	})));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn function_call() {
+	let program = Program {
+	    statements: vec![
+		Statement::Let {
+		    identifier: Expression::Identifier("foo".to_string()),
+		    expression: Expression::Function {
+			parameters: Some(vec![
+			    Box::new(Expression::Identifier("x".to_string()))
+			]),
+			body: Box::new(Statement::Block {
+			    statements: Some(vec![
+				Box::new(Statement::Expression { expression: Expression::Identifier("x".to_string()) })
+			    ])
+			})
+		    }
+		},
+		Statement::Expression {
+		    expression: Expression::Call {
+			function: Box::new(Expression::Identifier("foo".to_string())),
+			arguments: Some(vec![
+			    Box::new(Expression::Integer(10))
+			])
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Integer(10));
 	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 }

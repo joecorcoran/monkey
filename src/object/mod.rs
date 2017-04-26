@@ -1,5 +1,5 @@
 use ast::Statement;
-use engine::Env;
+use engine::EnvRef;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Object {
@@ -12,7 +12,7 @@ pub enum Object {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Function {
-    pub env: Env,
+    pub env: EnvRef,
     pub parameters: Option<Vec<String>>,
     pub body: Box<Statement>
 }
