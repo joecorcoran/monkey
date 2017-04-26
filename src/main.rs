@@ -12,7 +12,6 @@ mod parser;
 mod token;
 
 use lexer::Lexer;
-use object::Object;
 use parser::Parser;
 use engine::{Env, Eval};
 
@@ -35,8 +34,7 @@ fn repl() {
 		    Ok(ast) => {
 			let result = ast.eval(env.clone());
 			match result {
-			    // TODO implement proper printing for all primitives
-			    Ok(object) => print_object(object),
+			    Ok(object) => println!("{}", object),
 			    Err(error) => println!("Error: {:?}", error)
 			}
 		    },
@@ -45,15 +43,5 @@ fn repl() {
 	    },
 	    Err(_)   => println!("No input"),
 	}
-    }
-}
-
-fn print_object(object: Object) {
-    match object {
-	Object::Integer(primitive) => println!("{}", primitive),
-	Object::Boolean(primitive) => println!("{}", primitive),
-	Object::Null => println!("null"),
-	Object::Function(_) => println!("(function)"),
-	obj => println!("{:?}", obj)
     }
 }
