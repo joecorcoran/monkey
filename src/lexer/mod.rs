@@ -1,5 +1,5 @@
 use unicode_segmentation::UnicodeSegmentation as US;
-use std_unicode::str::UnicodeStr;
+use std::char;
 use token::*;
 
 pub struct Lexer<'a> {
@@ -41,12 +41,16 @@ impl<'a> Lexer<'a> {
     }
 
     fn is_alphabetic(g: &'a str) -> bool {
-        g.is_alphanumeric() && !Self::is_numeric(g)
+        g.chars().all(char::is_alphanumeric) && !Self::is_numeric(g)
+    }
+
+    fn is_whitespace(g: &'a str) -> bool {
+        g.chars().all(char::is_whitespace)
     }
 
     fn take_alphanumeric(&mut self) -> String {
         let mut alphanum = vec![];
-        while self.peek().unwrap_or("").is_alphanumeric() {
+        while self.peek().unwrap_or("").chars().all(char::is_alphanumeric) {
             match self.next() {
                 Some(g) => alphanum.push(g),
                 None => break
@@ -69,7 +73,7 @@ impl<'a> Lexer<'a> {
     pub fn next_token(&mut self) -> Option<Token> {
         match self.peek() {
             // Swallow whitespace
-            Some(g) if g.is_whitespace() => {
+            Some(g) if Self::is_whitespace(g) => {
                 self.next();
                 self.next_token()
             },

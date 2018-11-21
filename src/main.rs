@@ -1,7 +1,4 @@
-#![feature(unicode)]
-
 extern crate rustyline;
-extern crate std_unicode;
 extern crate unicode_segmentation;
 
 mod ast;

@@ -1,11 +1,3 @@
-[root]
-name = "monkey"
-version = "0.0.0"
-dependencies = [
- "rustyline 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "unicode-segmentation 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
 [[package]]
 name = "bitflags"
 version = "0.4.0"
@@ -29,6 +21,14 @@ dependencies = [
 name = "libc"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "monkey"
+version = "0.0.0"
+dependencies = [
+ "rustyline 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-segmentation 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "nix"
