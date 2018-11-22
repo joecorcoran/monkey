@@ -11,6 +11,15 @@ pub enum Object {
     Return(Box<Object>)
 }
 
+impl Object {
+    pub fn ret(self) -> Object {
+	match self {
+	    Object::Return(o) => *o,
+	    _ => self
+	}
+    }
+}
+
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 	match *self {

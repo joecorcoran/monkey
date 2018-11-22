@@ -185,10 +185,11 @@ fn eval_minus_prefix(object: Object) -> EvalResult {
 fn eval_infix(env: EnvRef, left: &Box<Expression>, operator: &Token, right: &Box<Expression>) -> EvalResult {
     let left_value = left.eval(env.clone());
     if left_value.is_err() { return left_value }
+
     let right_value = right.eval(env.clone());
     if right_value.is_err() { return right_value }
 
-    match (left_value.unwrap(), right_value.unwrap()) {
+    match (left_value.unwrap().ret(), right_value.unwrap().ret()) {
 	(Object::Integer(l), Object::Integer(r)) => eval_integer_infix(l, operator, r),
 	(Object::Boolean(l), Object::Boolean(r)) => eval_boolean_infix(l, operator, r),
 	(l, r) => Err(Error::TypeMismatch(l, r))
@@ -499,6 +500,41 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn infix_with_function_call() {
+	let program = Program {
+	    statements: vec![
+		Statement::Let {
+		    identifier: Expression::Identifier("foo".to_string()),
+		    expression: Expression::Function {
+			parameters: Some(vec![
+			    Box::new(Expression::Identifier("x".to_string()))
+			]),
+			body: Box::new(Statement::Block {
+			    statements: Some(vec![
+				Box::new(Statement::Return { expression: Expression::Identifier("x".to_string()) })
+			    ])
+			})
+		    }
+		},
+		Statement::Expression {
+		    expression: Expression::Infix {
+			left: Box::new(Expression::Call {
+			    function: Box::new(Expression::Identifier("foo".to_string())),
+			    arguments: Some(vec![
+				Box::new(Expression::Integer(10))
+			    ])
+			}),
+			operator: Token::Minus,
+			right: Box::new(Expression::Integer(2))
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Integer(8));
 	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 }
