@@ -7,6 +7,7 @@ pub enum Object {
     Boolean(bool),
     Function(Box<Function>),
     Integer(i32),
+    Str(String),
     Null,
     Return(Box<Object>)
 }
@@ -26,6 +27,7 @@ impl fmt::Display for Object {
 	    Object::Boolean(ref b) => write!(f, "{}", b),
 	    Object::Function(ref ff) => ff.fmt(f),
 	    Object::Integer(ref i) => write!(f, "{}", i),
+	    Object::Str(ref s) => write!(f, "\"{}\"", s),
 	    Object::Null => write!(f, "null"),
 	    Object::Return(ref o) => o.fmt(f)
 	}

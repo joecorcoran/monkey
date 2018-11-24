@@ -155,6 +155,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
 	match self.peek() {
 	    Some(Token::Identifier(_)) => self.parse_identifier(),
+	    Some(Token::Str(_)) => self.parse_string(),
 	    Some(Token::Integer(_)) => self.parse_integer(),
 	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
 	    Some(Token::LParen) => self.parse_group(),
@@ -314,6 +315,14 @@ impl<'a, 'b> Parser<'a, 'b> {
 	}
     }
 
+    fn parse_string(&mut self) -> Option<Expression> {
+	if let Some(Token::Str(s)) = self.next() {
+	    Some(Expression::Str(s))
+	} else {
+	    None
+	}
+    }
+
     fn parse_integer(&mut self) -> Option<Expression> {
 	if let Some(Token::Integer(i)) = self.next() {
 	    Some(Expression::Integer(i.parse().unwrap()))
@@ -375,6 +384,12 @@ mod test {
     fn identifier() {
 	let program = parse("foo;");
 	assert_first_statement(program, Statement::Expression { expression: Expression::Identifier("foo".to_string()) });
+    }
+
+    #[test]
+    fn string() {
+	let program = parse("\"hello\"");
+	assert_first_statement(program, Statement::Expression { expression: Expression::Str("hello".to_string()) });
     }
 
     #[test]

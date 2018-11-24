@@ -87,6 +87,7 @@ impl Eval for Expression {
     fn eval(&self, env: EnvRef) -> EvalResult {
 	match *self {
 	    Expression::Identifier(ref i) => eval_identifier(env, i),
+	    Expression::Str(ref s) => Ok(Object::Str(s.to_owned())),
 	    Expression::Integer(i) => Ok(Object::Integer(i as i32)),
 	    Expression::Boolean(b) => Ok(if b { TRUE } else { FALSE }),
 	    Expression::Prefix { operator: ref o, right: ref r } => eval_prefix(env, o, r),
@@ -190,9 +191,17 @@ fn eval_infix(env: EnvRef, left: &Box<Expression>, operator: &Token, right: &Box
     if right_value.is_err() { return right_value }
 
     match (left_value.unwrap().ret(), right_value.unwrap().ret()) {
+	(Object::Str(l), Object::Str(r)) => eval_string_infix(l, operator, r),
 	(Object::Integer(l), Object::Integer(r)) => eval_integer_infix(l, operator, r),
 	(Object::Boolean(l), Object::Boolean(r)) => eval_boolean_infix(l, operator, r),
 	(l, r) => Err(Error::TypeMismatch(l, r))
+    }
+}
+
+fn eval_string_infix(left: String, operator: &Token, right: String) -> EvalResult {
+    match *operator {
+	Token::Plus => Ok(Object::Str(format!("{}{}", left, right))),
+	_ => Err(Error::UnknownOperator)
     }
 }
 
@@ -319,6 +328,23 @@ mod test {
 	};
 	let expected_err = Err(Error::UnknownOperator);
 	assert_eq!(expected_err, program_err.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn string_infix() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Infix {
+			left: Box::new(Expression::Str("hello".to_string())),
+			operator: Token::Plus,
+			right: Box::new(Expression::Str("!".to_string()))
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Str("hello!".to_string()));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
     #[test]

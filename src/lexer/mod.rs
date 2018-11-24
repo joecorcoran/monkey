@@ -36,8 +36,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn is_numeric(g: &'a str) -> bool {
-        let first_char = g.chars().next().unwrap();
-        first_char.is_digit(10)
+        g.chars().all(|c| c.is_digit(10))
     }
 
     fn is_alphabetic(g: &'a str) -> bool {
@@ -70,6 +69,25 @@ impl<'a> Lexer<'a> {
         num.concat()
     }
 
+    fn take_string(&mut self) -> String {
+        self.next();
+        let mut string = vec![];
+        while let Some(g) = self.peek() {
+            match g {
+                "\\" => {
+                    string.push(self.next().unwrap());
+                    string.push(self.next().unwrap());
+                },
+                "\"" => {
+                    self.next();
+                    break;
+                },
+                _ => string.push(self.next().unwrap())
+            }
+        }
+        string.concat()
+    }
+
     pub fn next_token(&mut self) -> Option<Token> {
         match self.peek() {
             // Swallow whitespace
@@ -88,6 +106,11 @@ impl<'a> Lexer<'a> {
                     _ => {}
                 }
                 Some(lookup(result.concat()))
+            },
+            // Strings
+            Some("\"") => {
+                let string = self.take_string();
+                Some(Token::Str(string))
             },
             // Integers
             Some(g) if Self::is_numeric(g) => {
@@ -165,6 +188,20 @@ mod test {
         assert_eq!(Token::Semicolon, l.next_token().unwrap());
 
         assert_eq!(None, l.next_token())
+    }
+
+    #[test]
+    fn token_string() {
+        let s = "\"hello\"";
+        let mut l = Lexer::new(s);
+        assert_eq!(Token::Str("hello".to_string()), l.next_token().unwrap());
+    }
+
+    #[test]
+    fn token_string_escape() {
+        let s = "\"he\\\"llo\"";
+        let mut l = Lexer::new(s);
+        assert_eq!(Token::Str("he\\\"llo".to_string()), l.next_token().unwrap());
     }
 
     #[test]
