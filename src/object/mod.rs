@@ -6,6 +6,7 @@ use std::fmt;
 pub enum Object {
     Boolean(bool),
     Function(Box<Function>),
+    Builtin(String, usize),
     Integer(i32),
     Str(String),
     Null,
@@ -26,6 +27,7 @@ impl fmt::Display for Object {
 	match *self {
 	    Object::Boolean(ref b) => write!(f, "{}", b),
 	    Object::Function(ref ff) => ff.fmt(f),
+	    Object::Builtin(ref name, ref arity) => write!(f, "{}:{}", name, arity),
 	    Object::Integer(ref i) => write!(f, "{}", i),
 	    Object::Str(ref s) => write!(f, "\"{}\"", s),
 	    Object::Null => write!(f, "null"),
