@@ -38,7 +38,7 @@ fn repl() {
 		    Err(error) => println!("Error: {}", error)
 		}
 	    },
-	    Err(_)   => println!("No input"),
+	    Err(_) => println!("No input"),
 	}
     }
 }
