@@ -1,0 +1,14 @@
+[package]
+name = "monkey-web"
+version = "0.0.0"
+authors = ["Joe Corcoran <joe@corcoran.online>"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+monkey-core = { path = "../monkey-core" }
+
+[profile.release]
+lto = true

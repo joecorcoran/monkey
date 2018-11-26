@@ -1,1 +1,3 @@
 target/
+monkey-web/node_modules/
+monkey-web/dist/

@@ -2,5 +2,6 @@
 members = [
 	"./",
 	"./monkey-core",
-	"./monkey-cli"
+	"./monkey-cli",
+  "./monkey-web"
 ]

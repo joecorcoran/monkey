@@ -9,4 +9,5 @@ pub mod token;
 
 pub use engine::{Env, Eval};
 pub use lexer::Lexer;
+pub use object::Object;
 pub use parser::Parser;

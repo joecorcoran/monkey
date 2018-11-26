@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<head>
+  <title>Monkey :: Execute Monkey code in the browser</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+    header {
+      margin: 0;
+      padding: 1rem;
+    }
+    h1 {
+      margin: 0;
+      padding: 0;
+    }
+    #workspace {
+      display: flex;
+      flex-flow: row nowrap;
+      height: 70%;
+      margin: 0;
+      padding: 1rem;
+      font-family: Courier, monospace;
+    }
+    #leftcol, #rightcol {
+      flex: 1;
+      height: 100%;
+      border: 1px solid #EEE;
+      padding: 0.5rem;
+    }
+    #leftcol {
+      color: #333;
+    }
+    #leftcol textarea {
+      font-family: Courier, monospace;
+      width: 100%;
+      height: 99.5%;
+      border: none;
+      resize: none;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #rightcol {
+      border-left: none;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <header><h1>Monkey</h1></header>
+
+  <section id="workspace">
+    <section id="leftcol">
+      <textarea id="input"></textarea>
+    </section>
+    <section id="rightcol">
+      <div id="output"></div>
+    </section>
+  </section>
+</body>
+</html>
