@@ -1,0 +1,8 @@
+[package]
+name = "monkey-cli"
+version = "0.0.0"
+authors = ["Joe Corcoran <joe@corcoran.online>"]
+
+[dependencies]
+rustyline = "1.0.0"
+monkey-core = { path = "../monkey-core" }

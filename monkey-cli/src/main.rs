@@ -1,16 +1,7 @@
 extern crate rustyline;
-extern crate unicode_segmentation;
+extern crate monkey_core;
 
-mod ast;
-mod engine;
-mod lexer;
-mod object;
-mod parser;
-mod token;
-
-use lexer::Lexer;
-use parser::Parser;
-use engine::{Env, Eval};
+use monkey_core::{Env, Eval, Lexer, Parser};
 
 fn main() {
     // TODO switch on argv between running file/stdin and repl
