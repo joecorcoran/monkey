@@ -42,15 +42,27 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_error(&mut self) {
-	self.errors.push("Could not parse expression".to_string());
+	self.errors.push("Could not parse".to_string());
     }
 
-    fn skip_syntax(&mut self, expected: Token) {
+    fn expect_token(&mut self, expected: Token) {
 	if let Some(token) = self.peek() {
 	    if token == expected {
 		self.next();
 	    } else {
 		self.peek_error(expected);
+	    }
+	} else {
+	    self.peek_error(expected);
+	}
+    }
+
+    fn allow_token(&mut self, allowed: Token) {
+	if let Some(token) = self.peek() {
+	    if token == allowed {
+		self.next();
+	    } else {
+		self.peek_error(allowed);
 	    }
 	}
     }
@@ -72,10 +84,10 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_statement_let(&mut self) -> Option<Statement> {
-	self.skip_syntax(Token::Let);
+	self.expect_token(Token::Let);
 	
 	if let Some(id) = self.parse_identifier() {
-	    self.skip_syntax(Token::Assign);
+	    self.expect_token(Token::Assign);
 
 	    if let Some(expression) = self.parse_expression(Precedence::Lowest) {
 		self.end_statement();
@@ -88,14 +100,14 @@ impl<'a, 'b> Parser<'a, 'b> {
 		None
 	    }
 	} else {
-	    self.peek_error(Token::Identifier("*".to_string()));
+	    self.parse_error();
 	    None
 	}
 
     }
 
     fn parse_statement_return(&mut self) -> Option<Statement> {
-	self.skip_syntax(Token::Return);
+	self.expect_token(Token::Return);
 
 	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
 	    self.end_statement();
@@ -119,7 +131,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 		    }
 		}
 	    }
-	    self.skip_syntax(Token::RBrace);
+	    self.expect_token(Token::RBrace);
 	    Some(Statement::Block {
 		statements: (if statements.is_empty() { None } else { Some(statements) })
 	    })
@@ -155,7 +167,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
 	match self.peek() {
 	    Some(Token::Identifier(_)) => self.parse_identifier(),
-	    Some(Token::Str(_)) => self.parse_string(),
+	    Some(Token::StrLDelim) => self.parse_string(),
 	    Some(Token::Integer(_)) => self.parse_integer(),
 	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
 	    Some(Token::LParen) => self.parse_group(),
@@ -189,6 +201,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 			right: Box::new(right)
 		    })
 		} else {
+		    self.parse_error();
 		    None
 		}
 	    },
@@ -198,7 +211,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_call(&mut self, function: Box<Expression>) -> Option<Expression> {
-	self.skip_syntax(Token::LParen);
+	self.expect_token(Token::LParen);
 
 	let mut args: Vec<Box<Expression>> = vec![];
 	while let Some(token) = self.peek() {
@@ -212,14 +225,14 @@ impl<'a, 'b> Parser<'a, 'b> {
 		    if let Some(arg) = self.parse_expression(Precedence::Lowest) {
 			args.push(Box::new(arg));
 		    } else {
-			self.peek_error(Token::Identifier("*".to_string()));
-			return None
+			self.parse_error();
+			return None;
 		    }
 		}
 	    }
 	}
 
-	self.skip_syntax(Token::RParen);
+	self.expect_token(Token::RParen);
 
 	Some(Expression::Call {
 	    function: function,
@@ -228,7 +241,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_function(&mut self) -> Option<Expression> {
-	self.skip_syntax(Token::Function);
+	self.expect_token(Token::Function);
 
 	if Some(Token::LParen) == self.peek() {
 	    let parameters = self.parse_parameters();
@@ -246,7 +259,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_parameters(&mut self) -> Parameters {
-	self.skip_syntax(Token::LParen);
+	self.expect_token(Token::LParen);
 
 	let mut parameters: Vec<Box<Expression>> = vec![];
 	while let Some(token) = self.peek() {
@@ -267,19 +280,20 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    }
 	}
 
-	self.skip_syntax(Token::RParen);
+	self.expect_token(Token::RParen);
 	if parameters.is_empty() { None } else { Some(parameters) }
     }
 
     fn parse_if(&mut self) -> Option<Expression> {
-	self.skip_syntax(Token::If);
-	self.skip_syntax(Token::LParen);
+	self.expect_token(Token::If);
+	self.expect_token(Token::LParen);
 
 	if let Some(condition) = self.parse_expression(Precedence::Lowest) {
-	    self.skip_syntax(Token::RParen);    
+	    self.expect_token(Token::RParen);
 
 	    if let Some(consequence) = self.parse_statement_block() {
-		self.skip_syntax(Token::Else);
+		self.allow_token(Token::Else);
+
 		let alternative = self.parse_statement_block().and_then(|b| Some(Box::new(b)));
 		Some(Expression::If {
 		    condition: Box::new(condition),
@@ -297,10 +311,10 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_group(&mut self) -> Option<Expression> {
-	self.skip_syntax(Token::LParen);
+	self.expect_token(Token::LParen);
 
 	if let Some(expression) = self.parse_expression(Precedence::Lowest) {
-	    self.skip_syntax(Token::RParen);
+	    self.expect_token(Token::RParen);
 	    Some(expression)
 	} else {
 	    None
@@ -316,11 +330,21 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_string(&mut self) -> Option<Expression> {
-	if let Some(Token::Str(s)) = self.next() {
-	    Some(Expression::Str(s))
-	} else {
-	    None
-	}
+	self.expect_token(Token::StrLDelim);
+
+	let result = match self.next() {
+	    Some(Token::StrBody(s)) => {
+		Some(Expression::Str(s))
+	    },
+	    Some(Token::StrRDelim) => {
+		Some(Expression::Str("".to_string()))
+	    },
+	    _ => {
+		None
+	    }
+	};
+	self.expect_token(Token::StrRDelim);
+	result
     }
 
     fn parse_integer(&mut self) -> Option<Expression> {
@@ -351,6 +375,16 @@ mod test {
 	match program {
 	    Ok(p) => p,
 	    Err(e) => panic!("Parse error(s): {}", e)
+	}
+    }
+
+    fn assert_error(input: &str, error: &String) {
+	let mut lexer = Lexer::new(input);
+	let mut parser = Parser::new(&mut lexer);
+	let program = parser.parse();
+	match program {
+	    Ok(_) => panic!("No error found"),
+	    Err(e) => assert_eq!(error, &e)
 	}
     }
 
@@ -388,8 +422,22 @@ mod test {
 
     #[test]
     fn string() {
-	let program = parse("\"hello\"");
-	assert_first_statement(program, Statement::Expression { expression: Expression::Str("hello".to_string()) });
+	let program = parse("\"hello world\"; \"  again\"");
+	assert_eq!(program.statements, vec![
+	    Statement::Expression { expression: Expression::Str("hello world".to_string()) },
+	    Statement::Expression { expression: Expression::Str("  again".to_string()) }
+	]);
+    }
+
+    #[test]
+    fn string_escape() {
+	let program = parse("\"he\\\"llo\"");
+	assert_first_statement(program, Statement::Expression { expression: Expression::Str("he\\\"llo".to_string()) });
+    }
+
+    #[test]
+    fn string_not_closed() {
+	assert_error("\"whoops", &String::from("Expected to find StrRDelim"));
     }
 
     #[test]
@@ -427,6 +475,11 @@ mod test {
 	    }
 	};
 	assert_first_statement(eq_program, eq_statement);
+    }
+
+    #[test]
+    fn infix_expression_incomplete() {
+	assert_error("1 +", &String::from("Could not parse"));
     }
 
     #[test]

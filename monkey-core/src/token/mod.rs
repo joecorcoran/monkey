@@ -2,7 +2,9 @@
 pub enum Token {
     Identifier(String),
     Integer(String),
-    Str(String),
+    StrBody(String),
+    StrLDelim,
+    StrRDelim,
 
     Assign,
     Plus,

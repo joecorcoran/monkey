@@ -4,7 +4,8 @@ use token::*;
 
 pub struct Lexer<'a> {
     input: Vec<&'a str>,
-    index: Option<usize>
+    index: Option<usize>,
+    str_mode: bool
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -25,12 +26,17 @@ impl<'a> Lexer<'a> {
         let graphemes = US::graphemes(input, true).collect::<Vec<&str>>();
         Lexer {
             input: graphemes,
-            index: None
+            index: None,
+            str_mode: false
         }
     }
 
     fn peek(&mut self) -> Option<&'a str> {
-        let next_index = if self.index.is_none() { 0 } else { self.index.unwrap() + 1 };
+        let next_index = if self.index.is_none() {
+            0
+        } else {
+            self.index.unwrap() + 1
+        };
         let nxt = self.input.get(next_index);
         nxt.and_then(|n| Some(*n))
     }
@@ -69,8 +75,7 @@ impl<'a> Lexer<'a> {
         num.concat()
     }
 
-    fn take_string(&mut self) -> String {
-        self.next();
+    fn take_string_body(&mut self) -> String {
         let mut string = vec![];
         while let Some(g) = self.peek() {
             match g {
@@ -79,7 +84,6 @@ impl<'a> Lexer<'a> {
                     string.push(self.next().unwrap());
                 },
                 "\"" => {
-                    self.next();
                     break;
                 },
                 _ => string.push(self.next().unwrap())
@@ -91,7 +95,7 @@ impl<'a> Lexer<'a> {
     pub fn next_token(&mut self) -> Option<Token> {
         match self.peek() {
             // Swallow whitespace
-            Some(g) if Self::is_whitespace(g) => {
+            Some(g) if !self.str_mode && Self::is_whitespace(g) => {
                 self.next();
                 self.next_token()
             },
@@ -107,10 +111,20 @@ impl<'a> Lexer<'a> {
                 }
                 Some(lookup(result.concat()))
             },
-            // Strings
+            // String delimiters
             Some("\"") => {
-                let string = self.take_string();
-                Some(Token::Str(string))
+                self.next();
+                if self.str_mode {
+                    self.str_mode = false;
+                    Some(Token::StrRDelim)
+                } else {
+                    self.str_mode = true;
+                    Some(Token::StrLDelim)
+                }
+            },
+            // String body
+            Some(g) if g != "\"" && self.str_mode => {
+                Some(Token::StrBody(self.take_string_body()))
             },
             // Integers
             Some(g) if Self::is_numeric(g) => {
@@ -125,14 +139,19 @@ impl<'a> Lexer<'a> {
             // Single-grapheme tokens
             Some(_) => Some(lookup(self.next().unwrap())),
             // EOF
-            None => None
+            _ => None
         }
     }
 
     pub fn peek_token(&mut self) -> Option<Token> {
         let current_index = self.index;
+        let current_str_mode = self.str_mode;
+
         let token = self.next_token();
+
         self.index = current_index;
+        self.str_mode = current_str_mode;
+
         token
     }
 }
@@ -192,16 +211,46 @@ mod test {
 
     #[test]
     fn token_string() {
-        let s = "\"hello\"";
+        let s = "\"hello world\"";
         let mut l = Lexer::new(s);
-        assert_eq!(Token::Str("hello".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::StrLDelim, l.next_token().unwrap());
+        assert_eq!(Token::StrBody("hello world".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::StrRDelim, l.next_token().unwrap());
+        assert_eq!(None, l.next_token())
+    }
+
+    #[test]
+    fn token_string_empty() {
+        let s = "\"\"";
+        let mut l = Lexer::new(s);
+        assert_eq!(Token::StrLDelim, l.next_token().unwrap());
+        assert_eq!(Token::StrRDelim, l.next_token().unwrap());
+        assert_eq!(None, l.next_token())
+    }
+
+    #[test]
+    fn token_string_twice() {
+        let s = "\"hello world\"; \"  again\"";
+        let mut l = Lexer::new(s);
+        assert_eq!(Token::StrLDelim, l.next_token().unwrap());
+        assert_eq!(Token::StrBody("hello world".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::StrRDelim, l.next_token().unwrap());
+        assert_eq!(Token::Semicolon, l.next_token().unwrap());
+
+        assert_eq!(Token::StrLDelim, l.next_token().unwrap());
+        assert_eq!(Token::StrBody("  again".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::StrRDelim, l.next_token().unwrap());
+        assert_eq!(None, l.next_token())
     }
 
     #[test]
     fn token_string_escape() {
         let s = "\"he\\\"llo\"";
         let mut l = Lexer::new(s);
-        assert_eq!(Token::Str("he\\\"llo".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::StrLDelim, l.next_token().unwrap());
+        assert_eq!(Token::StrBody("he\\\"llo".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::StrRDelim, l.next_token().unwrap());
+        assert_eq!(None, l.next_token())
     }
 
     #[test]
