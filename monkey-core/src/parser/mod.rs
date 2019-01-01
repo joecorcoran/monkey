@@ -168,6 +168,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 	match self.peek() {
 	    Some(Token::Identifier(_)) => self.parse_identifier(),
 	    Some(Token::StrLDelim) => self.parse_string(),
+	    Some(Token::LBracket) => self.parse_array(),
 	    Some(Token::Integer(_)) => self.parse_integer(),
 	    Some(Token::True) | Some(Token::False) => self.parse_boolean(),
 	    Some(Token::LParen) => self.parse_group(),
@@ -208,6 +209,35 @@ impl<'a, 'b> Parser<'a, 'b> {
 	    Some(Token::LParen) => self.parse_call(left),
 	    _ => None
 	}
+    }
+
+    fn parse_array(&mut self) -> Option<Expression> {
+	self.expect_token(Token::LBracket);
+
+	let mut elements: Vec<Box<Expression>> = vec![];
+	while let Some(token) = self.peek() {
+	    match token {
+		Token::RBracket => break,
+		Token::Comma => {
+		    self.next();
+		    continue
+		},
+		_ => {
+		    if let Some(e) = self.parse_expression(Precedence::Lowest) {
+			elements.push(Box::new(e));
+		    } else {
+			self.parse_error();
+			return None;
+		    }
+		}
+	    }
+	}
+
+	self.expect_token(Token::RBracket);
+
+	Some(Expression::Array {
+	    elements: if elements.is_empty() { None } else { Some(elements) }
+	})
     }
 
     fn parse_call(&mut self, function: Box<Expression>) -> Option<Expression> {
@@ -652,6 +682,28 @@ mod test {
 	    }
 	};
 	assert_first_statement(program_no_args, statement_no_args);
+    }
+
+    #[test]
+    fn array() {
+	let program = parse("[1, 2]");
+	let statement = Statement::Expression {
+	    expression: Expression::Array {
+		elements: Some(vec![
+		    Box::new(Expression::Integer(1)),
+		    Box::new(Expression::Integer(2))
+		])
+	    }
+	};
+	assert_first_statement(program, statement);
+
+	let program_empty_array = parse("[]");
+	let statement_empty_array = Statement::Expression {
+	    expression: Expression::Array {
+		elements: None
+	    }
+	};
+	assert_first_statement(program_empty_array, statement_empty_array);
     }
 }
 

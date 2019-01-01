@@ -26,6 +26,8 @@ pub enum Token {
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
 
     Function,
     Let,
@@ -70,6 +72,8 @@ pub fn lookup<S: Into<String>>(identifier: S) -> Token {
         ")" => Token::RParen,
         "{" => Token::LBrace,
         "}" => Token::RBrace,
+        "[" => Token::LBracket,
+        "]" => Token::RBracket,
         
         "fn" => Token::Function,
         "let" => Token::Let,

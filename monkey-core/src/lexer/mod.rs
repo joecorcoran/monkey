@@ -254,6 +254,17 @@ mod test {
     }
 
     #[test]
+    fn token_array() {
+        let s = "[1, 2]";
+        let mut l = Lexer::new(s);
+        assert_eq!(Token::LBracket, l.next_token().unwrap());
+        assert_eq!(Token::Integer("1".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::Comma, l.next_token().unwrap());
+        assert_eq!(Token::Integer("2".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::RBracket, l.next_token().unwrap());
+    }
+
+    #[test]
     fn token_peekable() {
         let s = "a == b;";
         let mut l = Lexer::new(s);

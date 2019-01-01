@@ -9,6 +9,7 @@ pub enum Object {
     Builtin(String, usize),
     Integer(i32),
     Str(String),
+    Array(Vec<Box<Object>>),
     Null,
     Return(Box<Object>)
 }
@@ -27,6 +28,18 @@ impl fmt::Display for Object {
 	match *self {
 	    Object::Boolean(ref b) => write!(f, "{}", b),
 	    Object::Function(ref ff) => ff.fmt(f),
+	    Object::Array(ref objs) => {
+		let max = objs.len() - 1;
+		write!(f, "[");
+		for (i, o) in objs.iter().enumerate() {
+		    if i < max {
+			write!(f, "{}, ", o);
+		    } else {
+			write!(f, "{}", o);
+		    }
+		}
+		write!(f, "]")
+	    },
 	    Object::Builtin(ref name, ref arity) => write!(f, "{}:{}", name, arity),
 	    Object::Integer(ref i) => write!(f, "{}", i),
 	    Object::Str(ref s) => write!(f, "\"{}\"", s),

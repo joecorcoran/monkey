@@ -1,6 +1,7 @@
 use token::Token;
 
 pub type Arguments = Option<Vec<Box<Expression>>>;
+pub type ArrayElements = Option<Vec<Box<Expression>>>;
 pub type Parameters = Option<Vec<Box<Expression>>>;
 pub type Statements = Option<Vec<Box<Statement>>>;
 
@@ -22,7 +23,8 @@ pub enum Expression {
     Infix { left: Box<Expression>, operator: Token, right: Box<Expression> },
     If { condition: Box<Expression>, consequence: Box<Statement>, alternative: Option<Box<Statement>> },
     Function { parameters: Parameters, body: Box<Statement> },
-    Call { function: Box<Expression>, arguments: Arguments }
+    Call { function: Box<Expression>, arguments: Arguments },
+    Array { elements: ArrayElements }
 }
 
 #[derive(Debug, PartialEq)]

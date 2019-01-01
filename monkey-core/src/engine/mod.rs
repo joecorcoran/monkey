@@ -1,4 +1,4 @@
-use ast::{Arguments, Expression, Parameters, Program, Statement};
+use ast::{ArrayElements, Arguments, Expression, Parameters, Program, Statement};
 use object::{Object, Function};
 use token::Token;
 
@@ -96,7 +96,8 @@ impl Eval for Expression {
 	    Expression::Infix { left: ref l, operator: ref o, right: ref r } => eval_infix(env, l, o, r),
 	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(env, c, cq, a),
 	    Expression::Function { parameters: ref p, body: ref b } => eval_function(env, p, b),
-	    Expression::Call { function: ref f, arguments: ref a } => eval_call(env, f, a)
+	    Expression::Call { function: ref f, arguments: ref a } => eval_call(env, f, a),
+	    Expression::Array { elements: ref e } => eval_array(env, e)
 	}
     }
 }
@@ -108,6 +109,13 @@ fn eval_call(env: EnvRef, function_name: &Box<Expression>, arguments: &Arguments
 	apply_builtin(env.clone(), &name, arity, arguments)
     } else {
 	Err(Error::NotAFunction)
+    }
+}
+
+fn eval_array(env: EnvRef, elements: &ArrayElements) -> EvalResult {
+    match elements {
+	Some(es) => Ok(Object::Array(es.iter().map(|e| Box::new(e.eval(env.clone()).unwrap())).collect())),
+	None => Ok(Object::Array(Vec::new()))
     }
 }
 
@@ -485,6 +493,24 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Integer(10));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn array() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Array {
+			elements: Some(vec![
+			    Box::new(Expression::Integer(1)),
+			    Box::new(Expression::Integer(2))
+			])
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Array(vec![Box::new(Object::Integer(1)), Box::new(Object::Integer(2))]));
 	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
