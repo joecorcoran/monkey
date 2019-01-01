@@ -3,7 +3,6 @@ use object::{Object, Function};
 use token::Token;
 
 mod builtins;
-use self::builtins::{builtin_find, builtin_apply};
 
 mod env;
 pub use self::env::{Env, EnvRef};
@@ -122,7 +121,7 @@ fn apply_builtin(env: EnvRef, name: &String, arity: usize, arguments: &Arguments
     truncated_args.truncate(arity);
 
     let evaluated_args = truncated_args.iter().map(|a| a.eval(env.clone()).unwrap()).collect::<Vec<Object>>();
-    match builtin_apply(name, evaluated_args) {
+    match builtins::apply(name, evaluated_args) {
 	Some(object) => Ok(object),
 	None => Err(Error::NotAFunction)
     }
@@ -177,7 +176,7 @@ fn eval_function(env: EnvRef, parameters: &Parameters, body: &Box<Statement>) ->
 fn eval_identifier(env: EnvRef, name: &String) -> EvalResult {
     if let Some(object) = env.borrow().get(name) {
 	Ok(object.to_owned())
-    } else if let Some(builtin) = builtin_find(name) {
+    } else if let Some(builtin) = builtins::find(name) {
 	Ok(builtin)
     } else {
 	Err(Error::IdentifierNotFound(name.to_owned()))

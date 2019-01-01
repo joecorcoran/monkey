@@ -5,7 +5,7 @@ const BUILTINS: &[(&str, usize)] = &[
     ("len", 1)
 ];
 
-pub fn builtin_find(name: &String) -> Option<Object> {
+pub fn find(name: &String) -> Option<Object> {
     if let Some((name, arity)) =  BUILTINS.iter().find(|(n, _)| *n == name.as_str()) {
 	Some(Object::Builtin(name.to_string(), *arity))
     } else {
@@ -13,7 +13,7 @@ pub fn builtin_find(name: &String) -> Option<Object> {
     }
 }
 
-pub fn builtin_apply(name: &String, arguments: Vec<Object>) -> Option<Object> {
+pub fn apply(name: &String, arguments: Vec<Object>) -> Option<Object> {
     match name.as_str() {
 	"len" => Some(len(arguments.first().unwrap())),
 	_ => None
