@@ -29,7 +29,7 @@ impl fmt::Display for Object {
 	    Object::Boolean(ref b) => write!(f, "{}", b),
 	    Object::Function(ref ff) => ff.fmt(f),
 	    Object::Array(ref objs) => {
-		let max = objs.len() - 1;
+		let max = objs.len().checked_sub(1).unwrap_or(0);
 		write!(f, "[");
 		for (i, o) in objs.iter().enumerate() {
 		    if i < max {

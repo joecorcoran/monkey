@@ -6,7 +6,7 @@ const BUILTINS: &[(&str, usize)] = &[
 ];
 
 pub fn find(name: &String) -> Option<Object> {
-    if let Some((name, arity)) =  BUILTINS.iter().find(|(n, _)| *n == name.as_str()) {
+    if let Some((name, arity)) = BUILTINS.iter().find(|(n, _)| *n == name.as_str()) {
 	Some(Object::Builtin(name.to_string(), *arity))
     } else {
 	None
@@ -24,6 +24,9 @@ fn len(object: &Object) -> Object {
     match object {
 	Object::Str(s) => {
 	    Object::Integer(US::graphemes(s.as_str(), true).count() as i32)
+	},
+	Object::Array(elements) => {
+	    Object::Integer(elements.len() as i32)
 	},
 	_ => Object::Null
     }
