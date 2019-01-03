@@ -207,37 +207,27 @@ impl<'a, 'b> Parser<'a, 'b> {
 		}
 	    },
 	    Some(Token::LParen) => self.parse_call(left),
+	    Some(Token::LBracket) => {
+		self.parse_index(left)
+	    },
 	    _ => None
 	}
     }
 
-    fn parse_array(&mut self) -> Option<Expression> {
+    fn parse_index(&mut self, left: Box<Expression>) -> Option<Expression> {
 	self.expect_token(Token::LBracket);
 
-	let mut elements: Vec<Box<Expression>> = vec![];
-	while let Some(token) = self.peek() {
-	    match token {
-		Token::RBracket => break,
-		Token::Comma => {
-		    self.next();
-		    continue
-		},
-		_ => {
-		    if let Some(e) = self.parse_expression(Precedence::Lowest) {
-			elements.push(Box::new(e));
-		    } else {
-			self.parse_error();
-			return None;
-		    }
-		}
-	    }
+	if let Some(index) = self.parse_expression(Precedence::Lowest) {
+	    self.expect_token(Token::RBracket);
+
+	    Some(Expression::Index {
+		left: left,
+		index: Box::new(index)
+	    })
+	} else {
+	    self.parse_error();
+	    None
 	}
-
-	self.expect_token(Token::RBracket);
-
-	Some(Expression::Array {
-	    elements: if elements.is_empty() { None } else { Some(elements) }
-	})
     }
 
     fn parse_call(&mut self, function: Box<Expression>) -> Option<Expression> {
@@ -267,6 +257,35 @@ impl<'a, 'b> Parser<'a, 'b> {
 	Some(Expression::Call {
 	    function: function,
 	    arguments: if args.is_empty() { None } else { Some(args) }
+	})
+    }
+
+    fn parse_array(&mut self) -> Option<Expression> {
+	self.expect_token(Token::LBracket);
+
+	let mut elements: Vec<Box<Expression>> = vec![];
+	while let Some(token) = self.peek() {
+	    match token {
+		Token::RBracket => break,
+		Token::Comma => {
+		    self.next();
+		    continue
+		},
+		_ => {
+		    if let Some(e) = self.parse_expression(Precedence::Lowest) {
+			elements.push(Box::new(e));
+		    } else {
+			self.parse_error();
+			return None;
+		    }
+		}
+	    }
+	}
+
+	self.expect_token(Token::RBracket);
+
+	Some(Expression::Array {
+	    elements: if elements.is_empty() { None } else { Some(elements) }
 	})
     }
 
@@ -704,6 +723,18 @@ mod test {
 	    }
 	};
 	assert_first_statement(program_empty_array, statement_empty_array);
+    }
+
+    #[test]
+    fn index() {
+	let program = parse("something[1]");
+	let statement = Statement::Expression {
+	    expression: Expression::Index {
+		left: Box::new(Expression::Identifier("something".to_string())),
+		index: Box::new(Expression::Integer(1))
+	    }
+	};
+	assert_first_statement(program, statement);
     }
 }
 

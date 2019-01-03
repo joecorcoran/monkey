@@ -46,7 +46,8 @@ pub enum Precedence {
     Sum,
     Product,
     Prefix,
-    Call
+    Call,
+    Index
 }
 
 pub fn lookup<S: Into<String>>(identifier: S) -> Token {
@@ -89,6 +90,7 @@ pub fn lookup<S: Into<String>>(identifier: S) -> Token {
 
 pub fn precedence(token: &Token) -> Precedence {
     match *token {
+        Token::LBracket                => Precedence::Index,
         Token::LParen                  => Precedence::Call,
         Token::Slash | Token::Asterisk => Precedence::Product,
         Token::Plus | Token::Minus     => Precedence::Sum,

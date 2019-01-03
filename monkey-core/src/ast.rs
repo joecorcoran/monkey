@@ -21,6 +21,7 @@ pub enum Expression {
     Boolean(bool),
     Prefix { operator: Token, right: Box<Expression> },
     Infix { left: Box<Expression>, operator: Token, right: Box<Expression> },
+    Index { left: Box<Expression>, index: Box<Expression> },
     If { condition: Box<Expression>, consequence: Box<Statement>, alternative: Option<Box<Statement>> },
     Function { parameters: Parameters, body: Box<Statement> },
     Call { function: Box<Expression>, arguments: Arguments },

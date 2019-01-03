@@ -265,6 +265,16 @@ mod test {
     }
 
     #[test]
+    fn token_index() {
+        let s = "something[1]";
+        let mut l = Lexer::new(s);
+        assert_eq!(Token::Identifier("something".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::LBracket, l.next_token().unwrap());
+        assert_eq!(Token::Integer("1".to_string()), l.next_token().unwrap());
+        assert_eq!(Token::RBracket, l.next_token().unwrap());
+    }
+
+    #[test]
     fn token_peekable() {
         let s = "a == b;";
         let mut l = Lexer::new(s);

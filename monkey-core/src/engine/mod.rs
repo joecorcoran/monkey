@@ -16,6 +16,8 @@ pub enum Error {
     ArgumentsCount(usize, usize),
     DivisionByZero,
     IdentifierNotFound(String),
+    IndexNotAllowed,
+    IndexNotAnInteger,
     NotAFunction,
     TypeMismatch(Object, Object),
     UnknownOperator
@@ -94,6 +96,7 @@ impl Eval for Expression {
 	    Expression::Boolean(b) => Ok(if b { TRUE } else { FALSE }),
 	    Expression::Prefix { operator: ref o, right: ref r } => eval_prefix(env, o, r),
 	    Expression::Infix { left: ref l, operator: ref o, right: ref r } => eval_infix(env, l, o, r),
+	    Expression::Index { left: ref l, index: ref i } => eval_index(env, l, i),
 	    Expression::If { condition: ref c, consequence: ref cq, alternative: ref a } => eval_if(env, c, cq, a),
 	    Expression::Function { parameters: ref p, body: ref b } => eval_function(env, p, b),
 	    Expression::Call { function: ref f, arguments: ref a } => eval_call(env, f, a),
@@ -116,6 +119,29 @@ fn eval_array(env: EnvRef, elements: &ArrayElements) -> EvalResult {
     match elements {
 	Some(es) => Ok(Object::Array(es.iter().map(|e| Box::new(e.eval(env.clone()).unwrap())).collect())),
 	None => Ok(Object::Array(Vec::new()))
+    }
+}
+
+fn eval_index(env: EnvRef, left: &Box<Expression>, index: &Box<Expression>) -> EvalResult {
+    let id = left.eval(env.clone());
+    if id.is_err() { return id; }
+    let ix = index.eval(env.clone());
+    if ix.is_err() { return ix; }
+
+    match id.unwrap() {
+	Object::Array(elements) => {
+	    match ix.unwrap() {
+		Object::Integer(i) => {
+		    if let Some(e) = elements.get(i as usize) {
+			Ok((**e).clone())
+		    } else {
+			Ok(Object::Null)
+		    }
+		}
+		_ => Err(Error::IndexNotAnInteger)
+	    }
+	},
+	_ => Err(Error::IndexNotAllowed)
     }
 }
 
@@ -497,7 +523,7 @@ mod test {
     }
 
     #[test]
-    fn array() {
+    fn array_literal() {
 	let program = Program {
 	    statements: vec![
 		Statement::Expression {
@@ -511,6 +537,85 @@ mod test {
 	    ]
 	};
 	let expected = Ok(Object::Array(vec![Box::new(Object::Integer(1)), Box::new(Object::Integer(2))]));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn array_index() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Index {
+			left: Box::new(Expression::Array {
+			    elements: Some(vec![
+				Box::new(Expression::Str("hello".to_string())),
+				Box::new(Expression::Str("world".to_string()))
+			    ])
+			}),
+			index: Box::new(Expression::Integer(1))
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Str("world".to_string()));
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn array_index_oob() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Index {
+			left: Box::new(Expression::Array {
+			    elements: Some(vec![
+				Box::new(Expression::Str("hello".to_string())),
+				Box::new(Expression::Str("world".to_string()))
+			    ])
+			}),
+			index: Box::new(Expression::Integer(2))
+		    }
+		}
+	    ]
+	};
+	let expected = Ok(Object::Null);
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn array_index_left_err() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Index {
+			left: Box::new(Expression::Integer(1)),
+			index: Box::new(Expression::Integer(2))
+		    }
+		}
+	    ]
+	};
+	let expected = Err(Error::IndexNotAllowed);
+	assert_eq!(expected, program.eval(Env::env_ref(None)));
+    }
+
+    #[test]
+    fn array_index_err() {
+	let program = Program {
+	    statements: vec![
+		Statement::Expression {
+		    expression: Expression::Index {
+			left: Box::new(Expression::Array {
+			    elements: Some(vec![
+				Box::new(Expression::Str("hello".to_string())),
+				Box::new(Expression::Str("world".to_string()))
+			    ])
+			}),
+			index: Box::new(Expression::Str("hmm".to_string()))
+		    }
+		}
+	    ]
+	};
+	let expected = Err(Error::IndexNotAnInteger);
 	assert_eq!(expected, program.eval(Env::env_ref(None)));
     }
 
