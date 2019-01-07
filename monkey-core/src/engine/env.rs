@@ -25,7 +25,7 @@ impl Env {
 
     pub fn get(&self, key: &String) -> Option<Object> {
 	if let Some(obj) = self.bindings.get(key) {
-	    Some(obj.to_owned())
+	    Some(obj.clone())
 	} else {
 	    match self.outer {
 		Some(ref o) => o.borrow().get(key),
@@ -35,7 +35,7 @@ impl Env {
     }
 
     pub fn set(&mut self, key: String, value: Object) -> Object {
-	let ret = value.to_owned();
+	let ret = value.clone();
 	self.bindings.insert(key, value);
 	ret
     }

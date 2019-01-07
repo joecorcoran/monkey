@@ -6,7 +6,8 @@ const BUILTINS: &[(&str, usize)] = &[
     ("first", 1),
     ("last", 1),
     ("rest", 1),
-    ("push", 2)
+    ("push", 2),
+    ("puts", 1)
 ];
 
 pub fn find(name: &String) -> Option<Object> {
@@ -24,6 +25,7 @@ pub fn apply(name: &String, args: Vec<Object>) -> Option<Object> {
 	"last"  => Some(last(args.first().unwrap())),
 	"rest"  => Some(rest(args.first().unwrap())),
 	"push"  => Some(push(args.first().unwrap(), args.get(1).unwrap())),
+	"puts"  => Some(puts(args.first().unwrap())),
 	_ => None
     }
 }
@@ -43,8 +45,8 @@ fn len(object: &Object) -> Object {
 fn first(object: &Object) -> Object {
     match object {
 	Object::Array(elements) => {
-	    if let Some(e) = elements.get(0) {
-		(**e).clone()
+	    if let Some(e) = elements.first() {
+		*e.to_owned()
 	    } else {
 		Object::Null
 	    }
@@ -72,7 +74,7 @@ fn rest(object: &Object) -> Object {
 	    if let Some((_, rest)) = elements.split_first() {
 		Object::Array((*rest).to_vec())
 	    } else {
-		Object::Null
+		Object::Array(Vec::new())
 	    }
 	},
 	_ => Object::Null
@@ -89,4 +91,9 @@ fn push(array: &Object, object: &Object) -> Object {
 	},
 	_ => Object::Null
     }
+}
+
+fn puts(object: &Object) -> Object {
+    println!("{}", object);
+    Object::Null
 }

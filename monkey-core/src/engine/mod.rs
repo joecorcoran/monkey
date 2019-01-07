@@ -76,7 +76,9 @@ impl Eval for Statement {
 	    Statement::Let { identifier: ref id, expression: ref e } => {
 		if let &Expression::Identifier(ref key) = id {
 		    match e.eval(env.clone()) {
-			Ok(value) => Ok(env.borrow_mut().set(key.to_owned(), value)),
+			Ok(value) => {
+			    Ok(env.borrow_mut().set(key.to_owned(), value))
+			},
 			Err(e) => Err(e)
 		    }
 		} else {
@@ -106,10 +108,18 @@ impl Eval for Expression {
 }
 
 fn eval_call(env: EnvRef, function_name: &Box<Expression>, arguments: &Arguments) -> EvalResult {
+    let args = arguments
+		.to_owned()
+		.unwrap_or(vec![])
+		.iter()
+		.map(|a| a.eval(env.clone())
+		.unwrap())
+		.collect::<Vec<Object>>();
+
     if let Ok(Object::Function(function)) = function_name.eval(env.clone()) {
-	apply_function(env.clone(), &function, arguments)
+	apply_function(&function, &args)
     } else if let Ok(Object::Builtin(name, arity)) = function_name.eval(env.clone()) {
-	apply_builtin(env.clone(), &name, arity, arguments)
+	apply_builtin(&name, arity, &args)
     } else {
 	Err(Error::NotAFunction)
     }
@@ -145,37 +155,35 @@ fn eval_index(env: EnvRef, left: &Box<Expression>, index: &Box<Expression>) -> E
     }
 }
 
-fn apply_builtin(env: EnvRef, name: &String, arity: usize, arguments: &Arguments) -> EvalResult {
-    let a = arguments.to_owned().unwrap_or(vec![]);
-    if a.len() != arity {
-	return Err(Error::ArgumentsCount(a.len(), arity))
+fn apply_builtin(name: &String, arity: usize, arguments: &Vec<Object>) -> EvalResult {
+    if arguments.len() != arity {
+	return Err(Error::ArgumentsCount(arguments.len(), arity))
     }
 
-    let mut truncated_args = a.clone();
+    let mut truncated_args = arguments.to_owned();
     truncated_args.truncate(arity);
 
-    let evaluated_args = truncated_args.iter().map(|a| a.eval(env.clone()).unwrap()).collect::<Vec<Object>>();
-    match builtins::apply(name, evaluated_args) {
+    match builtins::apply(name, truncated_args) {
 	Some(object) => Ok(object),
 	None => Err(Error::NotAFunction)
     }
 }
 
-fn apply_function(env: EnvRef, function: &Function, arguments: &Arguments) -> EvalResult {
-    let a = arguments.to_owned().unwrap_or(vec![]);
+fn apply_function(function: &Function, arguments: &Vec<Object>) -> EvalResult {
     match function.parameters {
 	Some(ref p) => {
-	    if p.len() != a.len() { return Err(Error::ArgumentsCount(a.len(), p.len())); }
-	    let mut args = a.iter().enumerate();
-	    while let Some((i, arg)) = args.next() {
-		if let Ok(obj) = arg.eval(env.clone()) {
-		    let key = p.get(i).unwrap().to_owned();
-		    function.env.borrow_mut().set(key, obj);
-		}
+	    if p.len() != arguments.len() {
+		return Err(Error::ArgumentsCount(arguments.len(), p.len()));
+	    }
+
+	    let mut args = arguments.iter().enumerate();
+	    while let Some((i, obj)) = args.next() {
+		let key = p.get(i).unwrap().to_owned();
+		function.env.borrow_mut().set(key, obj.to_owned());
 	    }
 	},
 	None => {
-	    if a.len() > 0 { return Err(Error::ArgumentsCount(a.len(), 0)); }
+	    if arguments.len() > 0 { return Err(Error::ArgumentsCount(arguments.len(), 0)); }
 	}
     }
     function.body.eval(function.env.clone())
@@ -209,7 +217,7 @@ fn eval_function(env: EnvRef, parameters: &Parameters, body: &Box<Statement>) ->
 
 fn eval_identifier(env: EnvRef, name: &String) -> EvalResult {
     if let Some(object) = env.borrow().get(name) {
-	Ok(object.to_owned())
+	Ok(object.clone())
     } else if let Some(builtin) = builtins::find(name) {
 	Ok(builtin)
     } else {
