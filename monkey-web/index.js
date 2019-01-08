@@ -22,7 +22,7 @@ monkey.then(monkey => {
   input.addEventListener("input", throttle(function(e) {
     try {
       let result = monkey.evaluate(e.target.value);
-      output.innerText = result;
+      output.innerText = result.value; // unwrap
     } catch(error) {
       output.innerText = error;
     }
