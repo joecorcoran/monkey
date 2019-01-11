@@ -22,8 +22,10 @@ monkey.then(monkey => {
   input.addEventListener("input", throttle(function(e) {
     try {
       let result = monkey.evaluate(e.target.value);
-      output.innerText = result.value; // unwrap
+      output.style.color = '#333';
+      output.innerText = JSON.stringify(result.value, null, 2); // unwrap
     } catch(error) {
+      output.style.color = '#CC0000';
       output.innerText = error;
     }
   }, 400, this));

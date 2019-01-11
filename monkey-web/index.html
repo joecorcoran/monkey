@@ -6,49 +6,67 @@
       box-sizing: border-box;
       font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
     }
+
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
+      color: #333;
     }
+
     header {
       margin: 0;
       padding: 1rem;
     }
-    h1 {
+
+    h1, h2, h3 {
       margin: 0;
       padding: 0;
     }
+
     #workspace {
       display: flex;
       flex-flow: row nowrap;
-      height: 70%;
+      height: 80%;
       margin: 0;
       padding: 1rem;
       font-family: Courier, monospace;
     }
+
     #leftcol, #rightcol {
       flex: 1;
       height: 100%;
       border: 1px solid #EEE;
       padding: 0.5rem;
     }
+
     #leftcol {
       color: #333;
     }
+
     #leftcol textarea {
+      color: #333;
       font-family: Courier, monospace;
       width: 100%;
-      height: 99.5%;
+      height: 80%;
       border: none;
       resize: none;
+      margin-top: 1rem;
       overflow-y: auto;
       overflow-x: hidden;
     }
+
     #rightcol {
+      color: #333;
       border-left: none;
-      color: #555;
+    }
+
+    #rightcol #output {
+      font-family: Courier, monospace;
+      height: 80%;
+      width: 100%;
+      margin-top: 1rem;
     }
   </style>
 </head>
@@ -58,10 +76,12 @@
 
   <section id="workspace">
     <section id="leftcol">
+      <h2>Input</h2>
       <textarea id="input"></textarea>
     </section>
     <section id="rightcol">
-      <div id="output"></div>
+      <h2>Output</h2>
+      <pre id="output"></pre>
     </section>
   </section>
 </body>
